@@ -86,6 +86,7 @@
 
         <div id="pantallaAdmin" class="hidden text-center py-4 space-y-4">
             <div class="flex justify-center text-amber-600">
+<<<<<<< HEAD
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
@@ -99,12 +100,30 @@
                     <span id="txtEstadoAdmision" class="text-sm font-extrabold text-red-600 uppercase">Bloqueado</span>
                     <button id="btnToggleRegistro" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all">
                         Cambiar Estado
+=======
+                <svg xmlns="http://www.w3.org/2000/xl" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">Panel de Control Maestro</h3>
+            
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <p class="text-xs font-bold text-gray-700 uppercase">Estado de Admisión:</p>
+                <div class="flex items-center justify-center space-x-3">
+                    <span id="txtEstadoAdmision" class="text-sm font-extrabold text-emerald-600 uppercase">Abierto</span>
+                    <button id="btnToggleRegistro" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all">
+                        Cambiar
+>>>>>>> 79cb458431e83aee045ff671d357329546ee3ca2
                     </button>
                 </div>
             </div>
 
             <button id="btnSalirAdmin" class="text-xs text-gray-500 hover:text-gray-800 underline block mx-auto pt-2">
+<<<<<<< HEAD
                 Cerrar Sesión Administrador
+=======
+                Cerrar Sesión Admin
+>>>>>>> 79cb458431e83aee045ff671d357329546ee3ca2
             </button>
         </div>
 
@@ -121,13 +140,13 @@
             </div>
             <h4 class="text-base font-bold text-gray-900">¿Estás completamente seguro?</h4>
             <p class="text-xs text-gray-500 leading-relaxed">
-                Al regresar a llenar el formulario se borrará tu actual decisión y registro en el torneo.
+                Al regresar se borrará tu actual registro en el torneo.
             </p>
             <div class="flex space-x-3 pt-2">
                 <button id="btnModalNo" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold p-2.5 rounded-xl text-xs uppercase tracking-wider transition-all">
-                    No, quedarme
+                    No
                 </button>
-                <button id="btnModalSi" class="w-1/2 bg-red-600 hover:bg-red-700 text-white font-bold p-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-red-600/10">
+                <button id="btnModalSi" class="w-1/2 bg-red-600 hover:bg-red-700 text-white font-bold p-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md">
                     Sí, salir
                 </button>
             </div>
