@@ -201,6 +201,15 @@ def eliminar_juez(juez_id):
     return jsonify({"success": True, "message": "Juez eliminado correctamente de la base de datos."})
 
 
+#Se agrega la direccion en la que se proyectará el dashboard con los cambios en tiempo real 
+@app.route('/publico')
+def ver_publico():
+    """Ruta oficial para proyectar el tablero en el auditorio"""
+    return render_template('pantalla_publico.html')
+
+
 if __name__ == '__main__':
     inicializar_bd()  # Se ejecuta la base de datos antes de arrancar el server
-    app.run(debug=True, port=5000)
+    #app.run(debug=True, port=5000)
+    # Agregamos host='0.0.0.0' para abrir el servidor a la red local
+    app.run(debug=True, host='0.0.0.0', port=5000)
