@@ -207,6 +207,13 @@ def ver_publico():
     """Ruta oficial para proyectar el tablero en el auditorio"""
     return render_template('pantalla_publico.html')
 
+#Se agrega el modulo de barckets a mi sistema para mostrar los enfrentamientos en tiempo real
+@app.route('/brackets')
+def ver_brackets():
+    return render_template('brackets.html')
+
+
+
 
 if __name__ == '__main__':
     inicializar_bd()  # Se ejecuta la base de datos antes de arrancar el server
