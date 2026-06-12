@@ -1,1 +1,134 @@
-s
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guerra de Robots - Dashboard de Brackets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        .view { display: none; animation: fadeSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .view.active { display: block; }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Scrollbar estilizado para las tablas y el bracket horizontal */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #059669; border-radius: 10px; border: 2px solid #f1f5f9; }
+        ::-webkit-scrollbar-thumb:hover { background: #047857; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col justify-between items-center p-6 md:p-10 relative">
+
+    <button id="btnBack" onclick="goToMenu()" class="hidden fixed top-6 left-6 z-50 bg-white border border-gray-200 text-gray-600 px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg hover:text-emerald-700 hover:border-emerald-700 transition-all transform active:scale-95 flex items-center gap-2 text-xs uppercase tracking-wider">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        Menú Principal
+    </button>
+    
+    <header class="text-center mb-10 w-full max-w-4xl relative">
+        <h1 class="text-3xl md:text-5xl font-extrabold text-emerald-800 tracking-tight uppercase drop-shadow-sm">
+            Guerra de Robots
+        </h1>
+        <p class="text-emerald-700 text-sm md:text-base font-bold tracking-widest mt-2 uppercase opacity-90">
+            Monitoreo Ejecutivo de Fase de Eliminatorias
+        </p>
+        <div class="h-1.5 w-32 bg-emerald-800 mx-auto mt-4 rounded-full"></div>
+    </header>
+    
+    <main class="w-full max-w-[95%] 2xl:max-w-[1600px] flex-1 mb-10 flex flex-col items-center">
+        
+        <div class="view active w-full max-w-5xl" id="view-menu">
+            
+            <div class="bg-white border border-gray-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-center justify-center sm:justify-between shadow-sm gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-emerald-100 text-emerald-800 p-2 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                    </span>
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Sincronización Local</p>
+                        <p class="text-sm font-semibold text-gray-800">Exporta las llaves actuales</p>
+                    </div>
+                </div>
+                <button onclick="exportAllToExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 text-xs uppercase tracking-wider flex items-center gap-2">
+                    📊 Descargar Copia (.xlsx)
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div onclick="openCategory('pequenos')" class="bg-white border-2 border-transparent hover:border-red-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-red-400 transition-all group-hover:h-2"></div>
+                    <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">🥊</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Pequeños</h3>
+                    <span class="inline-block mt-3 px-4 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Modo Torneo</span>
+                </div>
+                
+                <div onclick="openCategory('mediano')" class="bg-white border-2 border-transparent hover:border-teal-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-teal-400 transition-all group-hover:h-2"></div>
+                    <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">⚔️</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Mediano</h3>
+                    <span class="inline-block mt-3 px-4 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Modo Torneo</span>
+                </div>
+
+                <div onclick="openCategory('grandes')" class="bg-white border-2 border-transparent hover:border-amber-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-amber-400 transition-all group-hover:h-2"></div>
+                    <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">🤖</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Grandes</h3>
+                    <span class="inline-block mt-3 px-4 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Modo Torneo</span>
+                </div>
+
+                <div onclick="openCategory('seguimiento')" class="bg-white border-2 border-transparent hover:border-sky-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group sm:col-span-1 lg:col-span-1">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-sky-400 transition-all group-hover:h-2"></div>
+                    <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">🏎️</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Seg. de línea</h3>
+                    <span class="inline-block mt-3 px-4 py-1.5 bg-sky-50 border border-sky-200 text-sky-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Tiempos</span>
+                </div>
+
+                <div onclick="openCategory('evasor')" class="bg-white border-2 border-transparent hover:border-purple-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group sm:col-span-2 lg:col-span-1">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-purple-400 transition-all group-hover:h-2"></div>
+                    <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">🧭</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Evasor</h3>
+                    <span class="inline-block mt-3 px-4 py-1.5 bg-sky-50 border border-sky-200 text-sky-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Tiempos</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="view w-full" id="view-pequenos">
+            <h2 class="text-3xl font-black text-center text-emerald-800 uppercase tracking-tight mb-8">🥊 Categoría Pequeños</h2>
+            <div id="tournament-pequenos" class="w-full"></div>
+        </div>
+        
+        <div class="view w-full" id="view-mediano">
+            <h2 class="text-3xl font-black text-center text-emerald-800 uppercase tracking-tight mb-8">⚔️ Categoría Mediano</h2>
+            <div id="tournament-mediano" class="w-full"></div>
+        </div>
+        
+        <div class="view w-full" id="view-grandes">
+            <h2 class="text-3xl font-black text-center text-emerald-800 uppercase tracking-tight mb-8">🤖 Categoría Grandes</h2>
+            <div id="tournament-grandes" class="w-full"></div>
+        </div>
+        
+        <div class="view w-full max-w-5xl" id="view-seguimiento">
+            <h2 class="text-3xl font-black text-center text-emerald-800 uppercase tracking-tight mb-8">🏎️ Seguimiento de línea</h2>
+            <div id="time-seguimiento"></div>
+        </div>
+        
+        <div class="view w-full max-w-5xl" id="view-evasor">
+            <h2 class="text-3xl font-black text-center text-emerald-800 uppercase tracking-tight mb-8">🧭 Evasor de obstáculos</h2>
+            <div id="time-evasor"></div>
+        </div>
+
+    </main>
+
+    <footer class="w-full max-w-md mx-auto text-center border-t border-gray-300 pt-4 mt-auto">
+        <p class="text-[10px] sm:text-xs font-bold text-emerald-900 uppercase tracking-wider">
+            Facultad de Ingeniería Mecánica y Eléctrica • UANL
+        </p>
+    </footer>
+
+    <script src="/static/brackets_backend.js"></script>
+
+</body>
+</html>

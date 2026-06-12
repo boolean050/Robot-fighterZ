@@ -2,13 +2,13 @@
 // PANTALLA DE PROYECCIÓN PÚBLICA - GUERRA DE ROBOTS FIME
 // =====================================================================
 
-// Diccionario que vincula los nombres de la BD con los contenedores HTML
+// CORREGIDO: Mapeo exacto adaptado a las categorías del Excel oficial de FIME
 const mapeoContenedores = {
-    "Mini Sumos": "lista-mini-sumos",
-    "1 lb": "lista-1lb",
-    "3 lb": "lista-3lb",
-    "Autónomos": "lista-autonomos",
-    "Humanoides": "lista-humanoides"
+    "Pequeños": "lista-pequeños",
+    "Mediano": "lista-mediano",
+    "Grandes": "lista-grandes",
+    "Seguimiento de línea": "lista-seguimiento-de-línea",
+    "Evasor de obstáculos": "lista-evasor-de-obstáculos"
 };
 
 /**
@@ -28,7 +28,7 @@ function actualizarTableroPublico() {
                 if (contenedor) contenedor.innerHTML = '';
             });
 
-            // Si no hay jueces aún, podemos dejar los contenedores limpios o poner un indicador
+            // Si no hay jueces aún, podemos dejar los contenedores limpios
             if (data.jueces.length === 0) {
                 console.log("Tablero limpio: Esperando registros de jueces...");
                 return;
@@ -36,7 +36,7 @@ function actualizarTableroPublico() {
 
             // 2. Recorremos los jueces reales devueltos por SQLite e inyectamos sus tarjetas
             data.jueces.forEach(juez => {
-                // Buscamos a qué columna pertenece según su categoría
+                // Buscamos a qué columna pertenece según su categoría exacta de la BD
                 const idContenedorTarget = mapeoContenedores[juez.categoria];
                 
                 if (idContenedorTarget) {
@@ -58,7 +58,7 @@ function renderizarJuezenPantalla(nombreJuez, idContenedor) {
     // Creamos la etiqueta de diseño para el nombre del juez
     const tarjetaJuez = document.createElement('p');
     
-    // DISEÑO: Estilo limpio de Tailwind con una leve animación fade-in al aparecer
+    // DISEÑO: Estilo limpio de Tailwind con una leve animación pulse para resaltar presencia
     tarjetaJuez.className = "bg-emerald-50/70 p-3 rounded-xl text-center text-sm font-bold border-2 border-emerald-200/50 text-emerald-900 shadow-sm transition-all transform duration-300 animate-pulse hover:scale-105";
     tarjetaJuez.innerText = `👨‍⚖️ ${nombreJuez}`;
     
