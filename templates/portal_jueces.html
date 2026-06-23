@@ -21,7 +21,7 @@
 
     <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border-2 border-emerald-800 z-10 my-12 relative overflow-hidden">
         
-        <div class="text-center mb-6">
+        <div id="encabezadoPrincipal" class="text-center mb-6">
             <div class="inline-block bg-emerald-50 text-emerald-800 p-3 rounded-full mb-2 shadow-sm border border-emerald-100">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
@@ -264,27 +264,37 @@
             </button>
         </div>
 
-        
-    </div>
+        <div id="pantallaFinal" class="hidden flex-col items-center justify-center text-center py-6 space-y-8 animate-fade-in">
+            <div class="relative">
+                <div class="absolute inset-0 bg-emerald-300 rounded-full blur-2xl opacity-40 animate-pulse"></div>
+                <div class="relative bg-gradient-to-br from-emerald-50 to-white p-8 rounded-full border-4 border-emerald-100 shadow-xl">
+                    <span class="text-7xl block transform hover:scale-110 transition-transform">🏆</span>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                <h3 class="text-3xl font-black text-emerald-900 uppercase tracking-widest">¡Torneo Concluido!</h3>
+                <p class="text-gray-500 font-bold text-xs uppercase tracking-widest px-4">
+                    Evaluación Técnico-Práctica Finalizada
+                </p>
+            </div>
 
-    <div id="pantallaFinal" class="hidden text-center py-8 space-y-5 animate-fade-in relative z-20 bg-white">
-        <div class="flex justify-center">
-            <div class="bg-emerald-50 p-4 rounded-full text-emerald-800 shadow-md border border-emerald-100 animate-bounce">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 w-full shadow-inner">
+                <p class="text-emerald-800 font-bold text-sm leading-relaxed">
+                    ¡Excelente trabajo, Juez! <br> 
+                    <span class="text-emerald-600 text-xs font-semibold">Tus evaluaciones han sido registradas en Control Maestro.</span>
+                </p>
+                <p class="text-emerald-900 font-black mt-3 text-sm">
+                    Nos vemos en el próximo evento. 👋
+                </p>
+            </div>
+            
+            <div class="pt-6 w-full border-t border-gray-100">
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Facultad de Ingeniería Mecánica y Eléctrica • UANL</p>
             </div>
         </div>
-        <h3 class="text-xl font-black text-emerald-800 uppercase tracking-wide">¡Torneo Concluido!</h3>
-        <p class="text-gray-700 font-bold text-sm leading-relaxed px-4">
-            Gracias por participar, los espero en el próximo evento, bonito día.
-        </p>
-        <div class="w-full max-w-xs mx-auto border-t border-gray-200 pt-4 mt-4">
-            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Facultad de Ingeniería Mecánica y Eléctrica • UANL</p>
-        </div>
-    </div>
-
-    <div id="modalAdvertencia" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        
+    </div> <div id="modalAdvertencia" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl border border-gray-100 text-center space-y-4 transform scale-95 transition-all">
             <h4 class="text-base font-bold text-gray-900">¿Estás completamente seguro?</h4>
             <p class="text-xs text-gray-500 leading-relaxed">Al regresar se borrará tu registro en el torneo.</p>

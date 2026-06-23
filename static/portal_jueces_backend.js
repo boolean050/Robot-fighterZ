@@ -107,10 +107,14 @@ function iniciarRadarArena() {
                 document.getElementById('pantallaAdmin').classList.add('hidden');
                 document.getElementById('juez-modo-combate').classList.add('hidden');
                 
-                // Muestra la pantalla final de agradecimiento
+                // Ocultamos el encabezado principal para que la despedida abarque todo
+                const headerGeneral = document.getElementById('encabezadoPrincipal');
+                if(headerGeneral) headerGeneral.classList.add('hidden');
+                
+                // Muestra la pantalla final de agradecimiento como FLEX
                 const finalScreen = document.getElementById('pantallaFinal');
                 if (finalScreen) {
-                    finalScreen.classList.remove('hidden');
+                    finalScreen.classList.replace('hidden', 'flex');
                 } else {
                      alert("¡Torneo Concluido! Gracias por participar.");
                      location.reload();
@@ -400,7 +404,14 @@ async function cargarDatosAdmin() {
                 });
             }
         }
-    } catch (e) {}
+        
+        // Limpiamos el error si todo cargó bien
+        const msgError = document.getElementById('errorMsg');
+        if(msgError) msgError.classList.add('hidden');
+        
+    } catch (e) {
+        console.error("Error al cargar admin:", e);
+    }
 }
 
 document.getElementById('btnToggleRegistro')?.addEventListener('click', async () => {
