@@ -119,9 +119,17 @@ def toggle_registro():
     conn.close()
     return jsonify({"success": True, "nuevo_estado": nuevo_estado})
 
+
 @app.route('/api/admin/jueces', methods=['GET'])
 def obtener_jueces():
-    jueces = [dict(row) for row in conectar_bd().execute('''SELECT jueces.id, jueces.nombre, categorias.nombre AS categoria FROM jueces JOIN categorias ON jueces.categoria_id = categorias.id ORDER BY categorias.nombre ASC, jueces.nombre ASC''').fetchall()]
+    query = '''
+        SELECT jueces.id, jueces.nombre, 
+            COALESCE(categorias.nombre, 'Sin Cat') AS categoria 
+        FROM jueces 
+        LEFT JOIN categorias ON jueces.categoria_id = categorias.id 
+        ORDER BY jueces.id DESC
+    '''
+    jueces = [dict(row) for row in conectar_bd().execute(query).fetchall()]
     return jsonify({"success": True, "jueces": jueces})
 
 @app.route('/api/admin/eliminar_juez/<int:juez_id>', methods=['POST'])
@@ -169,7 +177,7 @@ def guardar_competidores_masivo():
         
         for eq in lista_equipos:
             cursor.execute('''INSERT OR IGNORE INTO competidores (nombre, categoria_tag, docente, archivo_id) 
-                              VALUES (?, ?, ?, ?)''', (eq['nombre'], eq['categoria'], eq.get('docente', ''), archivo_id))
+                            VALUES (?, ?, ?, ?)''', (eq['nombre'], eq['categoria'], eq.get('docente', ''), archivo_id))
             
         conn.commit()
         return jsonify({"success": True, "message": "Equipos añadidos al padrón oficial."})
@@ -244,6 +252,29 @@ def ko_arena():
     conn.commit()
     conn.close()
     return jsonify({"success": True})
+
+# --- NUEVAS RUTAS DE LIMPIEZA Y CIERRE GLOBAL ---
+@app.route('/api/admin/arena/limpiar', methods=['POST'])
+def limpiar_arena():
+    data = request.get_json()
+    cat = data.get('categoria')
+    conn = conectar_bd()
+    conn.execute("UPDATE arena_activa SET estado = 'inactivo' WHERE categoria_tag = ?", (cat,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@app.route('/api/admin/evento/terminar', methods=['POST'])
+def terminar_evento():
+    conn = conectar_bd()
+    categorias = ["pequenos", "mediano", "grandes", "seguimiento", "evasor"]
+    for cat in categorias:
+        conn.execute('''INSERT OR REPLACE INTO arena_activa (categoria_tag, estado, robot1, robot2, tiempo_inicio) 
+                        VALUES (?, 'finalizado', '', '', 0)''', (cat,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+# ------------------------------------------------
 
 @app.route('/api/juez/enviar_veredicto', methods=['POST'])
 def guardar_veredicto():

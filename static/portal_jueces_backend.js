@@ -98,6 +98,24 @@ function iniciarRadarArena() {
                 document.getElementById('juez-modo-combate').classList.add('hidden');
                 if(timerInterval) clearInterval(timerInterval);
                 combateTerminado = false;
+            } else if (data.estado === 'finalizado') {
+                // NUEVO: SI EL ADMIN TERMINA EL EVENTO
+                clearInterval(arenaInterval);
+                if(timerInterval) clearInterval(timerInterval);
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('pantallaEspera').classList.add('hidden');
+                document.getElementById('pantallaAdmin').classList.add('hidden');
+                document.getElementById('juez-modo-combate').classList.add('hidden');
+                
+                // Muestra la pantalla final de agradecimiento
+                const finalScreen = document.getElementById('pantallaFinal');
+                if (finalScreen) {
+                    finalScreen.classList.remove('hidden');
+                } else {
+                     alert("¡Torneo Concluido! Gracias por participar.");
+                     location.reload();
+                }
+                localStorage.clear(); // Borra la sesión para que no regresen
             }
         } catch(e) {}
     }, 2000);
@@ -211,6 +229,10 @@ document.getElementById('btnEnviarVeredicto').addEventListener('click', async ()
 const btnIniciarArena = document.getElementById('btnAdminIniciarArena');
 if(btnIniciarArena) {
     btnIniciarArena.addEventListener('click', async () => {
+        // Borramos posible error pegado
+        const errorMsg = document.getElementById('errorMsg');
+        if (errorMsg) errorMsg.classList.add('hidden');
+
         const cat = document.getElementById('admin-arena-select').value;
         const r1 = document.getElementById('admin-r1-input').value;
         const r2 = document.getElementById('admin-r2-input').value;
@@ -254,12 +276,48 @@ if(btnAdminKO) {
     });
 }
 
+// NUEVO: BOTÓN LIMPIAR ARENA
+const btnAdminLimpiar = document.getElementById('btnAdminLimpiar');
+if(btnAdminLimpiar) {
+    btnAdminLimpiar.addEventListener('click', async () => {
+        const cat = document.getElementById('admin-arena-select').value;
+        if(!confirm("¿Limpiar la arena? Los jueces de esta categoría regresarán a la pantalla de espera.")) return;
+
+        try {
+            await fetch('/api/admin/arena/limpiar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categoria: cat })
+            });
+            resetearBotonAdmin();
+        } catch(e) { alert("Error al limpiar arena."); }
+    });
+}
+
+// NUEVO: BOTÓN TERMINAR EVENTO
+const btnAdminTerminarEvento = document.getElementById('btnAdminTerminarEvento');
+if(btnAdminTerminarEvento) {
+    btnAdminTerminarEvento.addEventListener('click', async () => {
+        if(!confirm("⚠️ ¿ESTÁS TOTALMENTE SEGURO?\nEsto dará por terminado el torneo globalmente y sacará a TODOS los jueces de las pantallas de evaluación de inmediato.")) return;
+
+        try {
+            const res = await fetch('/api/admin/evento/terminar', { method: 'POST' });
+            const data = await res.json();
+            if(data.success) {
+                alert("¡Torneo finalizado con éxito! Cerrando sesión maestro...");
+                localStorage.clear();
+                location.reload();
+            }
+        } catch(e) { alert("Error al dar por terminado el evento."); }
+    });
+}
+
 function resetearBotonAdmin() {
     if(adminCombatTimeout) clearTimeout(adminCombatTimeout);
     if(btnIniciarArena) {
         btnIniciarArena.disabled = false;
         btnIniciarArena.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
-        btnIniciarArena.innerHTML = "▶️ Iniciar Combate (5m)";
+        btnIniciarArena.innerHTML = "▶️ Iniciar";
     }
 }
 
