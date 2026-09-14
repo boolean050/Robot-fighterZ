@@ -6,7 +6,7 @@
     <title>Guerra de Robots - Dashboard de Brackets</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    
+    <script type="module" src="portal_jueces_backend.js"></script>
     <style>
         .view { display: none; animation: fadeSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .view.active { display: block; }
@@ -20,6 +20,7 @@
         ::-webkit-scrollbar-thumb { background: #059669; border-radius: 10px; border: 2px solid #f1f5f9; }
         ::-webkit-scrollbar-thumb:hover { background: #047857; }
     </style>
+
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col justify-between items-center p-6 md:p-10 relative">
 
@@ -128,7 +129,6 @@
         </p>
     </footer>
 
-    <script src="/static/brackets_backend.js"></script>
 
 </body>
 </html>
