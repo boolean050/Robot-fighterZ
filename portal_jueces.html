@@ -35,7 +35,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 13h6v1h-6v-1z" />
                 </svg>
             </div>
-            <h2 class="text-2xl font-bold text-emerald-800 tracking-wide uppercase">Guerra de Robots</h2>
+            <h2 class="text-2xl font-bold text-emerald-800 tracking-wide uppercase">Pelea de Robots</h2>
             <p id="subtituloPrincipal" class="text-gray-500 text-sm font-semibold">Iniciar Sesión - Docentes</p>
         </div>
 
@@ -159,15 +159,7 @@
         <div id="pantallaAdmin" class="hidden text-center py-2 space-y-4 max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin">
             <h3 class="text-lg font-bold text-gray-800 tracking-wide uppercase border-b pb-2">Panel Maestro</h3>
             
-            <!-- GENERADOR DE QR -->
-            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 shadow-sm text-center">
-                <h4 class="text-xs font-black uppercase text-indigo-800 mb-2">📲 Registro Express QR</h4>
-                <button id="btnGenerarQR" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-[10px] uppercase tracking-widest transition-all">Generar Código QR</button>
-                <div id="boxQR" class="hidden flex-col items-center mt-3">
-                    <img id="imgQR" src="" alt="QR" class="border-4 border-white shadow-md rounded-lg w-32 h-32 mb-2">
-                    <p class="text-[9px] text-gray-500 font-bold">Los docentes deben escanear esto para crear su cuenta.</p>
-                </div>
-            </div>
+            
 
             <!-- ARENA CONTROL -->
             <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-left shadow-sm">
@@ -186,19 +178,19 @@
                 </div>
             </div>
 
-            <!-- TABLA: LISTA DE MAESTROS -->
-            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3">
-                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">Lista de Maestros Registro</h4>
+            <!-- TABLA: EQUIPOS PARTICIPANTES (LOS ROBOTS) -->
+            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3 mt-4">
+                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">🤖 Padrón de Equipos Participantes</h4>
                 <div class="overflow-x-auto max-h-48 overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-[10px]">
-                        <thead class="bg-gray-100 font-bold uppercase text-gray-500 sticky top-0">
+                        <thead class="bg-emerald-100 font-bold uppercase text-emerald-800 sticky top-0">
                             <tr>
-                                <th class="px-1 py-1 text-left">Docente</th>
-                                <th class="px-1 py-1 text-center">Status</th>
-                                <th class="px-1 py-1 text-center">Acciones</th>
+                                <th class="px-2 py-1 text-left">ALIAS DEL EQUIPO</th>
+                                <th class="px-2 py-1 text-left">CATEGORÍA</th>
+                                <th class="px-2 py-1 text-left">FACULTAD</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaJuecesBody" class="divide-y divide-gray-200 bg-white"></tbody>
+                        <tbody id="tablaEquiposBody" class="divide-y divide-gray-200 bg-white"></tbody>
                     </table>
                 </div>
             </div>
@@ -219,27 +211,68 @@
                 <ul id="listaArchivos" class="space-y-1 mt-2"></ul>
             </div>
 
-            <!-- TABLA: EQUIPOS PARTICIPANTES (LOS ROBOTS) -->
-            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3 mt-4">
-                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">🤖 Padrón de Equipos Participantes</h4>
+            
+
+            <!-- TABLA: LISTA DE MAESTROS -->
+            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3">
+                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">Lista de Maestros Registro</h4>
                 <div class="overflow-x-auto max-h-48 overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-[10px]">
-                        <thead class="bg-emerald-100 font-bold uppercase text-emerald-800 sticky top-0">
+                        <thead class="bg-gray-100 font-bold uppercase text-gray-500 sticky top-0">
                             <tr>
-                                <th class="px-2 py-1 text-left">ALIAS DEL EQUIPO</th>
-                                <th class="px-2 py-1 text-left">CATEGORÍA</th>
-                                <th class="px-2 py-1 text-left">FACULTAD</th>
+                                <th class="px-1 py-1 text-left">Docente</th>
+                                <th class="px-1 py-1 text-center">Status</th>
+                                <th class="px-1 py-1 text-center">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaEquiposBody" class="divide-y divide-gray-200 bg-white"></tbody>
+                        <tbody id="tablaJuecesBody" class="divide-y divide-gray-200 bg-white"></tbody>
                     </table>
                 </div>
             </div>
+
+
+            <!-- GENERADOR DE QR -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 shadow-sm text-center">
+                <h4 class="text-xs font-black uppercase text-indigo-800 mb-2">📲 Registro Express QR</h4>
+                <button id="btnGenerarQR" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-[10px] uppercase tracking-widest transition-all">Generar Código QR</button>
+                <div id="boxQR" class="hidden flex-col items-center mt-3 w-full">
+                    <img id="imgQR" src="" alt="QR" class="border-4 border-white shadow-md rounded-lg w-36 h-36 mb-2 mx-auto">
+                    <p class="text-[10px] text-gray-500 font-bold mb-1 text-center">Los docentes deben escanear esto para crear su cuenta.</p>
+                    <a id="linkQR" href="#" target="_blank" class="text-[9px] font-mono text-indigo-600 hover:text-indigo-800 break-all text-center px-4"></a>
+                </div>
+            </div>
+
             
             <button id="btnSalirAdmin" class="text-[10px] text-red-600 font-bold underline block mx-auto pt-2 mt-4">Cerrar Sesión Admin</button>
         </div>
+
+        
     </div>
     
-    <script src="portal_jueces_backend.js" type="module"></script>
+    
+
+    <!-- MODAL ELEGANTE PARA EDITAR CATEGORÍA -->
+    <div id="modalEditarCat" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs border-2 border-emerald-800 transform scale-100">
+            <h3 class="text-lg font-black text-emerald-800 mb-1 uppercase tracking-wide">Editar Asignación</h3>
+            <p class="text-[10px] text-gray-500 font-bold mb-4">Selecciona la nueva categoría para este docente:</p>
+            
+            <select id="selectNuevaCat" class="w-full p-3 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm text-gray-800 font-bold focus:outline-none focus:border-emerald-700 cursor-pointer mb-5">
+                <option value="Pequeños">Pequeños</option>
+                <option value="Medianos">Medianos</option>
+                <option value="Grandes">Grandes</option>
+                <option value="Seguimiento de línea">Seguimiento de línea</option>
+                <option value="Evasor de obstáculos">Evasor de obstáculos</option>
+            </select>
+            
+            <div class="flex gap-2">
+                <button id="btnCancelarEdicion" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all">Cancelar</button>
+                <button id="btnGuardarEdicion" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/30">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    
+    <script src="portal_jueces_backend.js" type="module"></script>    
 </body>
 </html>

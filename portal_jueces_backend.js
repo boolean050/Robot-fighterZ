@@ -1,6 +1,6 @@
 // --- IMPORTACIONES DE FIREBASE (V9 Modular) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, writeBatch, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, writeBatch, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // TUS CREDENCIALES REALES
 const firebaseConfig = {
@@ -16,9 +16,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // --- VARIABLES GLOBALES Y MEMORIA ---
-let currentUser = localStorage.getItem('juez_nombre');
-let currentCategory = localStorage.getItem('juez_categoria');
-let isAdmin = localStorage.getItem('juez_role') === 'admin';
+let currentUser = sessionStorage.getItem('juez_nombre');
+let currentCategory = sessionStorage.getItem('juez_categoria');
+let isAdmin = sessionStorage.getItem('juez_role') === 'admin';
 
 let unsubscribeArena = null; 
 let unsubscribeSesion = null;
@@ -38,25 +38,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const isRegistroMode = urlParams.get('modo') === 'registro';
 
-    if (isAdmin) {
+    // REGLA DE ORO: Si trae el QR de registro, destruimos cualquier sesión 
+    // previa en este dispositivo para forzar un registro limpio.
+    if (isRegistroMode) {
+        sessionStorage.clear();
+        isAdmin = false;
+        currentUser = null;
+        currentCategory = null;
+        
+        mostrarPantalla('registroForm');
+        document.getElementById('subtituloPrincipal').textContent = "Registro Oficial de Docentes";
+    } 
+    // Si ya es admin guardado
+    else if (isAdmin) {
         mostrarPantalla('pantallaAdmin');
         window.cargarDatosAdmin();
-    } else if (currentUser && currentCategory) {
+    } 
+    // Si ya es juez guardado
+    else if (currentUser && currentCategory) {
         mostrarPantalla('pantallaEspera');
         document.getElementById('nombreAsignado').textContent = currentUser;
         document.getElementById('categoriaAsignada').textContent = currentCategory;
         iniciarRadarArena();
         iniciarRadarSesion(); 
-    } else {
-        if (isRegistroMode) {
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registroForm').classList.remove('hidden');
-            document.getElementById('subtituloPrincipal').textContent = "Registro Oficial de Docentes";
-        } else {
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('registroForm').classList.add('hidden');
-            document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
-        }
+    } 
+    // Si no hay sesión y no hay QR, pedimos login normal
+    else {
+        mostrarPantalla('loginForm');
+        document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
     }
 });
 
@@ -76,8 +85,13 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const msg = document.getElementById('errorMsgLogin');
 
     if (password === CODIGO_ADMIN) {
+        // Generar y guardar el token único
+        const adminToken = Date.now().toString() + Math.random().toString(36).substr(2);
+        sessionStorage.setItem('juez_role', 'admin');
+        sessionStorage.setItem('admin_token', adminToken);
+        try { setDoc(doc(db, "sistema", "sesion_admin"), { token: adminToken }); } catch(err) {}
+
         isAdmin = true;
-        localStorage.setItem('juez_role', 'admin');
         mostrarPantalla('pantallaAdmin');
         window.cargarDatosAdmin();
         return;
@@ -150,9 +164,9 @@ document.getElementById('registroForm').addEventListener('submit', async (e) => 
 function activarSesionDocente(nombre, categoria) {
     currentUser = nombre;
     currentCategory = categoria;
-    localStorage.setItem('juez_role', 'juez');
-    localStorage.setItem('juez_nombre', currentUser);
-    localStorage.setItem('juez_categoria', currentCategory);
+    sessionStorage.setItem('juez_role', 'juez');
+    sessionStorage.setItem('juez_nombre', currentUser);
+    sessionStorage.setItem('juez_categoria', currentCategory);
 
     mostrarPantalla('pantallaEspera');
     document.getElementById('nombreAsignado').textContent = currentUser;
@@ -170,12 +184,12 @@ function iniciarRadarSesion() {
     unsubscribeSesion = onSnapshot(ref, (docSnap) => {
         if (!docSnap.exists() || docSnap.data().sesion_activa === false) {
             alert("⚠️ Sesión terminada por el Administrador.");
-            localStorage.clear();
+            sessionStorage.clear();
             window.location.href = window.location.origin + window.location.pathname; 
         } else {
             if(docSnap.data().categoria !== currentCategory) {
                 currentCategory = docSnap.data().categoria;
-                localStorage.setItem('juez_categoria', currentCategory);
+                sessionStorage.setItem('juez_categoria', currentCategory);
                 document.getElementById('categoriaAsignada').textContent = currentCategory;
                 alert("🔄 El administrador ha cambiado tu categoría de evaluación.");
                 if(unsubscribeArena) unsubscribeArena();
@@ -187,6 +201,20 @@ function iniciarRadarSesion() {
 
 // --- 5. PANEL ADMIN: TABLA DE MAESTROS, HISTORIAL Y PADRÓN DE EQUIPOS ---
 window.cargarDatosAdmin = function() {
+    
+    // RADAR DE SEGURIDAD ADMIN: Tumbar si alguien más entra
+    onSnapshot(doc(db, "sistema", "sesion_admin"), (docSnap) => {
+        if (docSnap.exists()) {
+            const tokenEnBd = docSnap.data().token;
+            const miToken = sessionStorage.getItem('admin_token');
+            if (miToken && tokenEnBd !== miToken) {
+                alert("⚠️ Se ha iniciado sesión de Administrador en otro lugar. Esta ventana se cerrará por seguridad.");
+                sessionStorage.clear();
+                window.location.reload();
+            }
+        }
+    });
+    
     // Escuchar maestros en tiempo real
     onSnapshot(collection(db, "maestros_autorizados"), (snapshot) => {
         const tbody = document.getElementById('tablaJuecesBody');
@@ -206,7 +234,7 @@ window.cargarDatosAdmin = function() {
                     </td>
                     <td class="px-1 py-2 text-center text-[10px]">${statusHtml}</td>
                     <td class="px-1 py-2 text-center flex justify-center gap-1 mt-1">
-                        <button onclick="editarCategoria('${docSnap.id}')" title="Editar Categoría" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-2 rounded font-bold text-[9px] transition-all">✏️</button>
+                        <button onclick="editarCategoria('${docSnap.id}', '${m.categoria}')" title="Editar Categoría" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-2 rounded font-bold text-[9px] transition-all">✏️</button>
                         <button onclick="cerrarSesionDocente('${docSnap.id}')" title="Cerrar Sesión (Amarilla)" class="bg-amber-100 text-amber-600 hover:bg-amber-500 hover:text-white px-2 rounded font-bold text-[9px] transition-all">🟡</button>
                         <button onclick="eliminarDocente('${docSnap.id}')" title="Expulsar (Roja)" class="bg-red-100 text-red-600 hover:bg-red-600 hover:text-white px-2 rounded font-bold text-[9px] transition-all">🔴</button>
                     </td>
@@ -229,9 +257,12 @@ window.cargarDatosAdmin = function() {
                 const time = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const fechaExacta = `${day}/${month}/${year} ${time}`;
 
-                lista.innerHTML += `<li class="text-[10px] text-gray-600 flex justify-between bg-white p-1.5 rounded border border-gray-100 shadow-sm mb-1">
-                    <span class="font-bold text-emerald-700">📄 ${doc.data().nombre}</span>
-                    <span class="text-gray-400 font-mono">${fechaExacta}</span>
+                lista.innerHTML += `<li class="text-[10px] text-gray-600 flex justify-between items-center bg-white p-1.5 rounded border border-gray-100 shadow-sm mb-1">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-emerald-700">📄 ${doc.data().nombre}</span>
+                        <span class="text-gray-400 font-mono">${fechaExacta}</span>
+                    </div>
+                    <button onclick="eliminarArchivoExcel('${doc.id}', '${doc.data().nombre}')" title="Borrar equipos de este Excel" class="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white p-1.5 rounded transition-colors active:scale-90">🗑️</button>
                 </li>`;
             });
         }
@@ -243,16 +274,19 @@ window.cargarDatosAdmin = function() {
         const tablaEquipos = document.getElementById('tablaEquiposBody');
         if (tablaEquipos) tablaEquipos.innerHTML = '';
 
-        querySnapshot.forEach((doc) => { 
-            const data = doc.data();
+        querySnapshot.forEach((docSnap) => { 
+            const data = docSnap.data();
             todosLosRobots.push(data); 
             
             if (tablaEquipos) {
                 tablaEquipos.innerHTML += `
                 <tr class="hover:bg-emerald-50 border-b border-gray-100">
                     <td class="px-2 py-2 text-[10px] font-black text-gray-800 uppercase">${data.nombre}</td>
-                    <td class="px-2 py-2 text-[10px] text-gray-600 font-bold uppercase">${data.categoria_original}</td>
-                    <td class="px-2 py-2 text-[10px] text-gray-500 uppercase">${data.facultad}</td>
+                    <td class="px-2 py-2 text-[10px] text-gray-600 font-bold uppercase">${data.categoria_original || 'N/A'}</td>
+                    <td class="px-2 py-2 text-[10px] text-gray-500 uppercase flex justify-between items-center">
+                        <span>${data.facultad || 'N/A'}</span>
+                        <button onclick="eliminarEquipo('${docSnap.id}', '${data.nombre}')" title="Eliminar este equipo" class="bg-red-100 text-red-600 hover:bg-red-600 hover:text-white px-2 py-0.5 rounded font-bold transition-all ml-2">X</button>
+                    </td>
                 </tr>`;
             }
         });
@@ -271,12 +305,47 @@ window.eliminarDocente = async (id) => {
     await deleteDoc(doc(db, "maestros_autorizados", id));
 };
 
-window.editarCategoria = async (id) => {
-    const nuevaCat = prompt("Escribe la nueva categoría asignada:\n(Pequeños, Mediano, Grandes, Seguimiento de línea, Evasor de obstáculos)");
-    if(nuevaCat) {
-        await updateDoc(doc(db, "maestros_autorizados", id), { categoria: nuevaCat.trim() });
+// --- NUEVO SISTEMA PARA EDITAR CATEGORÍA (POP-UP ELEGANTE) ---
+let idDocenteEditando = null;
+
+window.editarCategoria = (id, categoriaActual) => {
+    idDocenteEditando = id;
+    const modal = document.getElementById('modalEditarCat');
+    const select = document.getElementById('selectNuevaCat');
+    
+    // Pre-seleccionar la categoría que ya tiene el maestro
+    for(let i = 0; i < select.options.length; i++) {
+        if(select.options[i].value === categoriaActual) {
+            select.selectedIndex = i;
+            break;
+        }
     }
+    
+    modal.classList.remove('hidden');
 };
+
+document.getElementById('btnCancelarEdicion')?.addEventListener('click', () => {
+    document.getElementById('modalEditarCat').classList.add('hidden');
+    idDocenteEditando = null;
+});
+
+document.getElementById('btnGuardarEdicion')?.addEventListener('click', async () => {
+    if(!idDocenteEditando) return;
+    
+    const nuevaCat = document.getElementById('selectNuevaCat').value;
+    const btn = document.getElementById('btnGuardarEdicion');
+    btn.innerHTML = "⏳...";
+    
+    try {
+        await updateDoc(doc(db, "maestros_autorizados", idDocenteEditando), { categoria: nuevaCat });
+        document.getElementById('modalEditarCat').classList.add('hidden');
+    } catch(e) {
+        alert("Error al actualizar la categoría");
+    } finally {
+        btn.innerHTML = "GUARDAR";
+        idDocenteEditando = null;
+    }
+});
 
 // --- GENERADOR DE CÓDIGO QR ---
 document.getElementById('btnGenerarQR')?.addEventListener('click', () => {
@@ -284,7 +353,14 @@ document.getElementById('btnGenerarQR')?.addEventListener('click', () => {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(urlRegistro)}`;
     
     document.getElementById('imgQR').src = qrUrl;
+    
+    // Nuevo: Asignar la URL al texto que pusimos abajo del QR
+    const link = document.getElementById('linkQR');
+    link.href = urlRegistro;
+    link.textContent = urlRegistro;
+
     document.getElementById('boxQR').classList.remove('hidden');
+    document.getElementById('boxQR').classList.add('flex'); // Asegura que use Flexbox para centrar
     document.getElementById('btnGenerarQR').textContent = "Actualizar QR";
 });
 
@@ -322,7 +398,7 @@ function iniciarRadarArena() {
             const finalScreen = document.getElementById('pantallaFinal');
             if (finalScreen) finalScreen.classList.replace('hidden', 'flex');
             
-            localStorage.clear();
+            sessionStorage.clear();
         }
     });
 }
@@ -540,7 +616,7 @@ function procesarExcel(file) {
                 
                 if (tag) {
                     const docRef = doc(collection(db, "competidores"));
-                    batch.set(docRef, { categoria_tag: tag, categoria_original: cat, nombre: nom, facultad: fac });
+                    batch.set(docRef, { categoria_tag: tag, categoria_original: cat, nombre: nom, facultad: fac, origen: file.name });
                     conteo++;
                 }
             }
@@ -575,6 +651,46 @@ document.getElementById('btnDescargarPlantilla')?.addEventListener('click', () =
 });
 
 document.getElementById('btnSalirAdmin')?.addEventListener('click', () => {
-    localStorage.clear();
+    sessionStorage.clear();
     window.location.reload();
-});
+}); 
+
+// --- ELIMINAR EXCEL Y SUS EQUIPOS EN CASCADA ---
+window.eliminarArchivoExcel = async (historialId, fileName) => {
+    if(!confirm(`🗑️ ¿Estás seguro de borrar el archivo "${fileName}"?\n\nEsto eliminará a TODOS los equipos que se cargaron con este archivo, dejando intactos a los demás.`)) return;
+    
+    try {
+        // 1. Buscar a todos los equipos que tengan el tatuaje de este archivo
+        const q = query(collection(db, "competidores"), where("origen", "==", fileName));
+        const snapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        
+        // 2. Apuntar la pistola a cada uno de esos equipos
+        snapshot.forEach((docSnap) => {
+            batch.delete(docSnap.ref); 
+        });
+        
+        // 3. Apuntar la pistola al registro del historial
+        batch.delete(doc(db, "historial_archivos", historialId)); 
+        
+        // 4. Jalar el gatillo (borrar todo de golpe)
+        await batch.commit();
+        alert(`✅ Archivo eliminado. Se borraron ${snapshot.size} equipos del padrón.`);
+        window.cargarDatosAdmin(); // Refrescar las tablas
+    } catch(e) {
+        console.error(e);
+        alert("Error al intentar eliminar el archivo.");
+    }
+};
+
+// --- ELIMINAR UN EQUIPO INDIVIDUAL DEL PADRÓN ---
+    window.eliminarEquipo = async (id, nombre) => {
+        if(!confirm(`⚠️ ¿Estás seguro de eliminar al equipo "${nombre}" del torneo?`)) return;
+        try {
+            await deleteDoc(doc(db, "competidores", id));
+            window.cargarDatosAdmin(); // Refrescar la tabla al instante
+        } catch (error) {
+            console.error(error);
+            alert("Error al eliminar el equipo.");
+        }
+    }
