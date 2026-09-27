@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,18 +14,23 @@
 
     <header>
         <div class="absolute top-0 left-0 hidden md:block">
-            <img src="/static/images/logofime.gif" alt="Logo UANL" class="h-20 w-auto object-contain opacity-90" onerror="this.style.display='none'">
+            <img src="/static/images/logofime.gif" alt="Logo UANL" class="h-20 w-auto object-contain opacity-90"
+                onerror="this.style.display='none'">
         </div>
         <div class="absolute top-0 right-0 hidden md:block">
-            <img src="/static/images/osofime.svg" alt="Logo FIME" class="h-20 w-auto object-contain opacity-90" onerror="this.style.display='none'">
+            <img src="/static/images/osofime.svg" alt="Logo FIME" class="h-20 w-auto object-contain opacity-90"
+                onerror="this.style.display='none'">
         </div>
     </header>
 
-    <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border-2 border-emerald-800 z-10 my-12 relative overflow-hidden">
-        
+    <div
+        class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border-2 border-emerald-800 z-10 my-12 relative overflow-hidden">
+
         <div id="encabezadoPrincipal" class="text-center mb-6">
-            <div class="inline-block bg-emerald-50 text-emerald-800 p-3 rounded-full mb-2 shadow-sm border border-emerald-100">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <div
+                class="inline-block bg-emerald-50 text-emerald-800 p-3 rounded-full mb-2 shadow-sm border border-emerald-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5a1 1 0 100-2 1 1 0 000 2z" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M7 19h10v2H7v-2z" />
@@ -42,30 +48,43 @@
         <!-- FORMULARIO 1: LOGIN NORMAL -->
         <form id="loginForm" class="space-y-5">
             <div>
-                <label class="block text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Nombre del Docente:</label>
-                <input type="text" id="loginNombre" placeholder="Ej. Ing. Daniel Mendoza" required 
+                <label class="block text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Nombre del
+                    Docente:</label>
+                <input type="text" id="loginNombre" placeholder="Ej. Ing. Pablito Rodriguez" required
                     class="w-full p-3 rounded-xl bg-gray-50 border-2 border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-700 transition-all">
             </div>
             <div>
-                <label class="block text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Contraseña:</label>
-                <input type="password" id="loginPassword" placeholder="••••••••" required 
-                    class="w-full p-3 rounded-xl bg-gray-50 border-2 border-gray-200 text-emerald-800 placeholder-gray-300 focus:outline-none focus:border-emerald-700 text-center text-xl tracking-widest transition-all">
+                <label
+                    class="block text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Contraseña:</label>
+                <div class="relative">
+                    <input type="password" id="loginPassword" placeholder="••••••••" required
+                        class="w-full p-3 rounded-xl bg-gray-50 border-2 border-gray-200 text-emerald-800 placeholder-gray-300 focus:outline-none focus:border-emerald-700 text-center pr-10">
+                    <button type="button" onclick="togglePassword('loginPassword', this)"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-lg hover:scale-110 transition-transform focus:outline-none">👁️</button>
+                </div>
             </div>
-            <button type="submit" class="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-bold p-3 rounded-xl shadow-lg shadow-emerald-800/20 transform active:scale-95 transition-all text-sm uppercase tracking-wider">
+            <button type="submit"
+                class="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-bold p-3 rounded-xl shadow-lg shadow-emerald-800/20 transform active:scale-95 transition-all text-sm uppercase tracking-wider">
                 Entrar al Panel
             </button>
-            <p id="errorMsgLogin" class="mt-4 text-center text-sm font-semibold text-red-700 hidden bg-red-50 p-2 rounded-lg border border-red-200"></p>
+            <p id="errorMsgLogin"
+                class="mt-4 text-center text-sm font-semibold text-red-700 hidden bg-red-50 p-2 rounded-lg border border-red-200">
+            </p>
         </form>
 
         <!-- FORMULARIO 2: REGISTRO POR QR -->
         <form id="registroForm" class="hidden space-y-4">
             <div>
-                <label class="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider mb-1">Nombre Completo:</label>
-                <input type="text" id="regNombre" placeholder="Ej. Ing. Daniel Mendoza" required class="w-full p-2.5 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm focus:outline-none focus:border-emerald-700">
+                <label class="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider mb-1">Nombre
+                    Completo:</label>
+                <input type="text" id="regNombre" placeholder="Ej. Ing. Daniel Mendoza" required
+                    class="w-full p-2.5 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm focus:outline-none focus:border-emerald-700">
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider mb-1">Categoría a Evaluar:</label>
-                <select id="regCategoria" required class="w-full p-2.5 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm text-gray-800 font-bold focus:outline-none focus:border-emerald-700 cursor-pointer">
+                <label class="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider mb-1">Categoría a
+                    Evaluar:</label>
+                <select id="regCategoria" required
+                    class="w-full p-2.5 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm text-gray-800 font-bold focus:outline-none focus:border-emerald-700 cursor-pointer">
                     <option value="" disabled selected>-- Elige tu categoría --</option>
                     <option value="Pequeños">Pequeños (Brackets)</option>
                     <option value="Mediano">Mediano (Brackets)</option>
@@ -77,24 +96,33 @@
             <!-- Contraseñas a dos columnas con Ojito -->
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                    <label class="block text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 text-left">Contraseña:</label>
+                    <label
+                        class="block text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 text-left">Contraseña:</label>
                     <div class="relative">
-                        <input type="password" id="regPassword1" required class="w-full p-2.5 rounded-lg bg-gray-50 border-2 border-gray-200 text-sm font-bold text-gray-700 focus:outline-none focus:border-emerald-500 transition-colors pr-8">
-                        <button type="button" onclick="togglePassword('regPassword1', this)" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-sm hover:scale-110 transition-transform">👁️</button>
+                        <input type="password" id="regPassword1" required
+                            class="w-full p-2.5 rounded-lg bg-gray-50 border-2 border-gray-200 text-sm font-bold text-gray-700 focus:outline-none focus:border-emerald-500 transition-colors pr-8">
+                        <button type="button" onclick="togglePassword('regPassword1', this)"
+                            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-sm hover:scale-110 transition-transform">👁️</button>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 text-left">Confirmar:</label>
+                    <label
+                        class="block text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 text-left">Confirmar:</label>
                     <div class="relative">
-                        <input type="password" id="regPassword2" required class="w-full p-2.5 rounded-lg bg-gray-50 border-2 border-gray-200 text-sm font-bold text-gray-700 focus:outline-none focus:border-emerald-500 transition-colors pr-8">
-                        <button type="button" onclick="togglePassword('regPassword2', this)" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-sm hover:scale-110 transition-transform">👁️</button>
+                        <input type="password" id="regPassword2" required
+                            class="w-full p-2.5 rounded-lg bg-gray-50 border-2 border-gray-200 text-sm font-bold text-gray-700 focus:outline-none focus:border-emerald-500 transition-colors pr-8">
+                        <button type="button" onclick="togglePassword('regPassword2', this)"
+                            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-sm hover:scale-110 transition-transform">👁️</button>
                     </div>
                 </div>
             </div>
-            <p class="text-[9px] text-gray-500 font-semibold leading-tight text-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                💡 Se recomienda usar mayúsculas, minúsculas, números y símbolos. <span class="text-red-500">Evita usar datos personales.</span>
+            <p
+                class="text-[9px] text-gray-500 font-semibold leading-tight text-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                💡 Se recomienda usar mayúsculas, minúsculas, números y símbolos. <span class="text-red-500">Evita usar
+                    datos personales.</span>
             </p>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-xl shadow-lg transform active:scale-95 transition-all text-sm uppercase tracking-wider mt-2">
+            <button type="submit"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-xl shadow-lg transform active:scale-95 transition-all text-sm uppercase tracking-wider mt-2">
                 Registrarme y Entrar
             </button>
             <p id="errorMsgRegistro" class="mt-2 text-center text-xs font-bold text-red-600 hidden"></p>
@@ -102,7 +130,8 @@
 
         <!-- PANTALLA DE ESPERA -->
         <div id="pantallaEspera" class="hidden text-center py-4 space-y-4">
-            <h3 class="text-lg font-bold text-emerald-800">Bienvenido, <span id="nombreAsignado" class="text-gray-900"></span></h3>
+            <h3 class="text-lg font-bold text-emerald-800">Bienvenido, <span id="nombreAsignado"
+                    class="text-gray-900"></span></h3>
             <div class="bg-gray-50 p-2 rounded-lg border border-gray-200">
                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Arena Asignada: </span>
                 <span id="categoriaAsignada" class="text-sm font-extrabold text-emerald-700 uppercase"></span>
@@ -111,38 +140,52 @@
             <div id="juez-modo-espera" class="py-8">
                 <div class="flex justify-center mb-4">
                     <div class="bg-amber-100 p-4 rounded-full text-amber-600 shadow-inner animate-pulse">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                 </div>
                 <h4 class="font-bold text-gray-800 text-lg">Esperando al admin...</h4>
                 <p class="text-xs text-gray-500 mt-2">La evaluación se desbloqueará cuando el combate inicie.</p>
+                <button onclick="mostrarModalLogoutEspera()"
+                    class="mt-5 text-[11px] text-red-500 font-bold underline hover:text-red-700 transition-colors cursor-pointer block mx-auto">Cerrar
+                    mi sesión</button>
             </div>
 
             <!-- MODO COMBATE -->
             <div id="juez-modo-combate" class="hidden text-left space-y-5 animate-fade-in">
-                <div class="bg-red-50 border-2 border-red-200 rounded-xl p-3 flex justify-between items-center shadow-inner">
+                <div
+                    class="bg-red-50 border-2 border-red-200 rounded-xl p-3 flex justify-between items-center shadow-inner">
                     <span class="text-xs font-black text-red-800 uppercase tracking-widest flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span> EN VIVO
                     </span>
-                    <span id="cronometro-juez" class="text-3xl font-mono font-black text-red-600 tracking-wider">05:00</span>
+                    <span id="cronometro-juez"
+                        class="text-3xl font-mono font-black text-red-600 tracking-wider">05:00</span>
                 </div>
                 <div class="flex items-center justify-between gap-2">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex-1 text-center truncate"><span id="juez-robot1" class="font-bold text-blue-900 text-xs">R1</span></div>
-                    <div class="bg-gray-800 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase z-10">VS</div>
-                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-2 flex-1 text-center truncate"><span id="juez-robot2" class="font-bold text-orange-900 text-xs">R2</span></div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex-1 text-center truncate"><span
+                            id="juez-robot1" class="font-bold text-blue-900 text-xs">R1</span></div>
+                    <div class="bg-gray-800 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase z-10">VS
+                    </div>
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-2 flex-1 text-center truncate"><span
+                            id="juez-robot2" class="font-bold text-orange-900 text-xs">R2</span></div>
                 </div>
                 <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                    <p class="text-xs font-black text-gray-700 uppercase tracking-widest border-b pb-2 mb-4 text-center">Registrar Acciones</p>
+                    <p
+                        class="text-xs font-black text-gray-700 uppercase tracking-widest border-b pb-2 mb-4 text-center">
+                        Registrar Acciones</p>
                     <div class="mb-5 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                         <p class="text-xs font-bold text-blue-800 mb-2" id="eval-robot1-name">R1</p>
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-[10px] font-semibold text-gray-600">Golpes</span>
                             <div class="flex items-center gap-2">
-                                <button onclick="modificarPuntos('r1-golpes', -1)" class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
+                                <button onclick="modificarPuntos('r1-golpes', -1)"
+                                    class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
                                 <span id="r1-golpes" class="font-mono font-bold w-4 text-center text-xs">0</span>
-                                <button onclick="modificarPuntos('r1-golpes', 1)" class="w-6 h-6 rounded bg-blue-600 text-white">+</button>
+                                <button onclick="modificarPuntos('r1-golpes', 1)"
+                                    class="w-6 h-6 rounded bg-blue-600 text-white">+</button>
                             </div>
                         </div>
                     </div>
@@ -151,43 +194,70 @@
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-[10px] font-semibold text-gray-600">Golpes</span>
                             <div class="flex items-center gap-2">
-                                <button onclick="modificarPuntos('r2-golpes', -1)" class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
+                                <button onclick="modificarPuntos('r2-golpes', -1)"
+                                    class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
                                 <span id="r2-golpes" class="font-mono font-bold w-4 text-center text-xs">0</span>
-                                <button onclick="modificarPuntos('r2-golpes', 1)" class="w-6 h-6 rounded bg-orange-600 text-white">+</button>
+                                <button onclick="modificarPuntos('r2-golpes', 1)"
+                                    class="w-6 h-6 rounded bg-orange-600 text-white">+</button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <button id="btnEnviarVeredicto" disabled class="w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest">⏳ Esperando...</button>
+                <button id="btnEnviarVeredicto" disabled
+                    class="w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest">⏳
+                    Esperando...</button>
             </div>
         </div>
 
         <!-- PANTALLA ADMIN -->
-        <div id="pantallaAdmin" class="hidden text-center py-2 space-y-4 max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin">
+        <div id="pantallaAdmin"
+            class="hidden text-center py-2 space-y-4 max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin">
             <h3 class="text-lg font-bold text-gray-800 tracking-wide uppercase border-b pb-2">Panel Maestro</h3>
-            
-            
 
-            <!-- ARENA CONTROL -->
-            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-left shadow-sm">
-                <h4 class="text-xs font-black uppercase tracking-widest mb-2 text-red-800">🎛️ Control de Arena</h4>
-                <select id="admin-arena-select" class="w-full text-xs p-2 rounded-lg border border-red-300 mb-2 font-bold">
-                    <option value="pequenos">Pequeños</option><option value="mediano">Mediano</option><option value="grandes">Grandes</option>
-                </select>
-                <div class="flex gap-2 mb-2">
-                    <select id="admin-r1-input" class="w-full text-xs p-2 rounded border"></select>
-                    <select id="admin-r2-input" class="w-full text-xs p-2 rounded border"></select>
-                </div>
-                <div class="flex gap-2">
-                    <button id="btnAdminIniciarArena" class="flex-1 bg-emerald-600 text-white font-bold py-2 rounded text-[10px] uppercase">▶️ Iniciar</button>
-                    <button id="btnAdminKO" class="bg-red-600 text-white font-bold px-3 py-2 rounded text-[10px] uppercase">🥊 K.O.</button>
-                    <button id="btnAdminLimpiar" class="bg-gray-500 text-white font-bold px-3 py-2 rounded text-[10px] uppercase">🧹 Limpiar</button>
-                </div>
-            </div>
+
+
+            <!-- CONTROL DE ARENA -->
+<div class="bg-amber-50/50 border border-amber-200/60 rounded-xl p-3 mb-4 shadow-sm">
+    <h4 class="text-[10px] font-black uppercase tracking-wider text-amber-800 mb-2 flex items-center gap-1">
+        🥊 Control de Arena
+    </h4>
+    
+    <select id="admin-arena-select" class="w-full mb-3 p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-gray-700 focus:outline-none transition-all">
+        <option value="Pequeños">Pequeños</option>
+        <option value="Mediano">Mediano</option>
+        <option value="Grandes">Grandes</option>
+        <option value="Seguimiento de línea">Seguimiento de línea</option>
+        <option value="Evasor de obstáculos">Evasor de obstáculos</option>
+    </select>
+
+    <div class="flex gap-2 mb-3">
+        <select id="admin-r1-input" class="w-1/2 p-2 bg-blue-50 border-2 border-blue-200 text-blue-900 font-black uppercase rounded-xl text-center shadow-sm focus:border-blue-500 focus:outline-none transition-all text-[10px]">
+            <option value="">-- ROBOT 1 --</option>
+        </select>
+        <span class="text-xs font-black text-red-500 self-center">VS</span>
+        <select id="admin-r2-input" class="w-1/2 p-2 bg-purple-50 border-2 border-purple-200 text-purple-900 font-black uppercase rounded-xl text-center shadow-sm focus:border-purple-500 focus:outline-none transition-all text-[10px]">
+            <option value="">-- ROBOT 2 --</option>
+        </select>
+    </div>
+
+    <!-- BOTONES -->
+    <div class="flex gap-2">
+        <button id="btnAdminIniciarArena" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95"> Iniciar</button>
+        <button id="btnAdminKO" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🥊 K.O.🥊</button>
+        <button id="btnAdminLimpiar" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
+    </div>
+</div>
 
             <!-- TABLA: EQUIPOS PARTICIPANTES (LOS ROBOTS) -->
             <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3 mt-4">
-                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">🤖 Padrón de Equipos Participantes</h4>
+                <div class="flex justify-between items-center mb-2 border-b pb-1">
+                    <h4 class="text-[10px] font-black uppercase tracking-wider text-gray-700">🤖 Padrón de Equipos
+                        Participantes</h4>
+                    <button id="btnMostrarModalAgregar" onclick="abrirModalAgregarEquipo()"
+                        class="bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded font-bold text-[9px] transition-all shadow-sm">
+                        + Agregar Equipo
+                    </button>
+                </div>
                 <div class="overflow-x-auto max-h-48 overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-[10px]">
                         <thead class="bg-emerald-100 font-bold uppercase text-emerald-800 sticky top-0">
@@ -195,6 +265,7 @@
                                 <th class="px-2 py-1 text-left">ALIAS DEL EQUIPO</th>
                                 <th class="px-2 py-1 text-left">CATEGORÍA</th>
                                 <th class="px-2 py-1 text-left">FACULTAD</th>
+                                <th class="px-2 py-1 text-center">ACCIONES</th>
                             </tr>
                         </thead>
                         <tbody id="tablaEquiposBody" class="divide-y divide-gray-200 bg-white"></tbody>
@@ -206,11 +277,13 @@
             <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-left">
                 <div class="flex justify-between items-center mb-2">
                     <h4 class="text-xs font-bold uppercase text-gray-600">📁 Gestor de Equipos</h4>
-                    <button id="btnDescargarPlantilla" type="button" class="text-[9px] font-extrabold bg-emerald-50 text-emerald-800 uppercase px-2 py-1 rounded border border-emerald-200">
+                    <button id="btnDescargarPlantilla" type="button"
+                        class="text-[9px] font-extrabold bg-emerald-50 text-emerald-800 uppercase px-2 py-1 rounded border border-emerald-200">
                         Plantilla
                     </button>
                 </div>
-                <div id="dropzoneExcel" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer bg-white">
+                <div id="dropzoneExcel"
+                    class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer bg-white">
                     <p class="text-[10px] font-bold text-gray-700">Arrastra tu Excel con los participantes</p>
                     <input type="file" id="inputExcel" class="hidden">
                 </div>
@@ -218,16 +291,38 @@
                 <ul id="listaArchivos" class="space-y-1 mt-2"></ul>
             </div>
 
-            
 
-            <!-- TABLA: LISTA DE MAESTROS -->
-            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3">
-                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">Lista de Maestros Registro</h4>
+
+            <!-- 3.1 TABLA: ADMINISTRADORES -->
+            <div class="bg-indigo-50 rounded-xl border border-indigo-200 text-left p-3 mb-4">
+                <h4
+                    class="text-[10px] font-black uppercase tracking-wider mb-2 text-indigo-800 border-b border-indigo-200 pb-1">
+                    👑 Tabla para Administradores</h4>
+                <div class="overflow-x-auto max-h-32 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-indigo-200 text-[10px]">
+                        <thead class="bg-indigo-100 font-bold uppercase text-indigo-800">
+                            <tr>
+                                <th class="px-1 py-1 text-left">ADMIN</th>
+                                <th class="px-1 py-1 text-center">CATEGORÍA</th>
+                                <th class="px-1 py-1 text-center">STATUS</th>
+                                <th class="px-1 py-1 text-center">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaAdminsBody" class="divide-y divide-indigo-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3.2 TABLA: MAESTROS REGISTRO -->
+            <div class="bg-gray-50 rounded-xl border border-gray-200 text-left p-3 mb-4">
+                <h4 class="text-[10px] font-black uppercase tracking-wider mb-2 text-gray-700 border-b pb-1">Lista de
+                    Maestros Registro</h4>
                 <div class="overflow-x-auto max-h-48 overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-[10px]">
                         <thead class="bg-gray-100 font-bold uppercase text-gray-500 sticky top-0">
                             <tr>
                                 <th class="px-1 py-1 text-left">Docente</th>
+                                <th class="px-1 py-1 text-left">Categoría</th>
                                 <th class="px-1 py-1 text-center">Status</th>
                                 <th class="px-1 py-1 text-center">Acciones</th>
                             </tr>
@@ -241,45 +336,121 @@
             <!-- GENERADOR DE QR -->
             <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 shadow-sm text-center">
                 <h4 class="text-xs font-black uppercase text-indigo-800 mb-2">📲 Registro Express QR</h4>
-                <button id="btnGenerarQR" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-[10px] uppercase tracking-widest transition-all">Generar Código QR</button>
+                <button id="btnGenerarQR"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-[10px] uppercase tracking-widest transition-all">Generar
+                    Código QR</button>
                 <div id="boxQR" class="hidden flex-col items-center mt-3 w-full">
-                    <img id="imgQR" src="" alt="QR" class="border-4 border-white shadow-md rounded-lg w-36 h-36 mb-2 mx-auto">
-                    <p class="text-[10px] text-gray-500 font-bold mb-1 text-center">Los docentes deben escanear esto para crear su cuenta.</p>
-                    <a id="linkQR" href="#" target="_blank" class="text-[9px] font-mono text-indigo-600 hover:text-indigo-800 break-all text-center px-4"></a>
+                    <img id="imgQR" src="" alt="QR"
+                        class="border-4 border-white shadow-md rounded-lg w-36 h-36 mb-2 mx-auto">
+                    <p class="text-[10px] text-gray-500 font-bold mb-1 text-center">Los docentes deben escanear esto
+                        para crear su cuenta.</p>
+                    <a id="linkQR" href="#" target="_blank"
+                        class="text-[9px] font-mono text-indigo-600 hover:text-indigo-800 break-all text-center px-4"></a>
                 </div>
             </div>
 
-            
-            <button id="btnSalirAdmin" class="text-[10px] text-red-600 font-bold underline block mx-auto pt-2 mt-4">Cerrar Sesión Admin</button>
+
+            <button id="btnSalirAdmin"
+                class="text-[10px] text-red-600 font-bold underline block mx-auto pt-2 mt-4">Cerrar Sesión
+                Admin</button>
         </div>
 
-        
-    </div>
-    
-    
 
-    <!-- MODAL ELEGANTE PARA EDITAR CATEGORÍA -->
+    </div>
+
+
+
+    <!-- MODAL EDITAR DOCENTE (SÚPER ADMIN) -->
     <div id="modalEditarCat" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs border-2 border-emerald-800 transform scale-100">
-            <h3 class="text-lg font-black text-emerald-800 mb-1 uppercase tracking-wide">Editar Asignación</h3>
-            <p class="text-[10px] text-gray-500 font-bold mb-4">Selecciona la nueva categoría para este docente:</p>
-            
-            <select id="selectNuevaCat" class="w-full p-3 rounded-xl bg-gray-50 border-2 border-gray-200 text-sm text-gray-800 font-bold focus:outline-none focus:border-emerald-700 cursor-pointer mb-5">
-                <option value="Pequeños">Pequeños</option>
-                <option value="Medianos">Medianos</option>
-                <option value="Grandes">Grandes</option>
-                <option value="Seguimiento de línea">Seguimiento de línea</option>
-                <option value="Evasor de obstáculos">Evasor de obstáculos</option>
-            </select>
-            
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs border-2 border-indigo-800 transform scale-100">
+            <h3 class="text-lg font-black text-indigo-800 mb-1 uppercase tracking-wide">Ajustes de Juez</h3>
+            <p id="nombreDocenteEditando" class="text-[11px] text-gray-500 font-bold mb-4 uppercase"></p>
+
+            <div class="space-y-4 mb-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Categoría Asignada</label>
+                    <select id="selectNuevaCat" class="w-full p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold focus:outline-none focus:border-indigo-600 transition-all">
+                        <option value="Pequeños">Pequeños</option>
+                        <option value="Mediano">Mediano</option>
+                        <option value="Grandes">Grandes</option>
+                        <option value="Seguimiento de línea">Seguimiento de línea</option>
+                        <option value="Evasor de obstáculos">Evasor de obstáculos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Resetear Contraseña</label>
+                    <!-- Lo dejamos como type="text" para que el admin pueda ver qué está escribiendo y decírselo al maestro -->
+                    <input type="text" id="inputNuevaPassword" placeholder="Dejar en blanco para no cambiarla" class="w-full p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-sm focus:outline-none focus:border-indigo-600 font-bold text-indigo-900 transition-all">
+                    <p class="text-[8px] text-gray-400 mt-1 uppercase font-bold">*Solo escribe aquí si el maestro olvidó su clave.</p>
+                </div>
+            </div>
+
             <div class="flex gap-2">
                 <button id="btnCancelarEdicion" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all">Cancelar</button>
-                <button id="btnGuardarEdicion" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/30">Guardar</button>
+                <button id="btnGuardarEdicion" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-600/30">Guardar</button>
             </div>
         </div>
     </div>
-    
-    
-    <script src="portal_jueces_backend.js" type="module"></script>    
+
+    <!-- MODAL CERRAR SESION ESPERA -->
+    <div id="modalLogoutEspera"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center transform transition-all">
+            <div class="text-4xl mb-3">🚪</div>
+            <h3 class="text-lg font-black text-gray-800 mb-2">¿Cerrar Sesión?</h3>
+            <p class="text-xs text-gray-500 font-bold mb-6">¿Deseas salir de la ronda actual y desconectarte del
+                sistema?</p>
+            <div class="flex gap-3">
+                <button onclick="cerrarModalLogoutEspera()"
+                    class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-xs uppercase transition-colors">Cancelar</button>
+                <button id="btnConfirmarLogoutEspera"
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-xs uppercase transition-colors shadow-lg shadow-red-500/30">Continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AGREGAR EQUIPO MANUALMENTE -->
+    <div id="modalAgregarEquipo"
+        class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+        <div
+            class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs border-2 border-emerald-800 transform scale-100">
+            <h3 class="text-lg font-black text-emerald-800 mb-1 uppercase tracking-wide">Nuevo Equipo</h3>
+            <p class="text-[10px] text-gray-500 font-bold mb-4">Ingresa los datos del competidor manual:</p>
+
+            <div class="space-y-3 mb-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Nombre del Equipo</label>
+                    <input type="text" id="nuevoEqNombre" placeholder="Ej. Cyber-Bravos"
+                        class="w-full p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-emerald-600">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Categoría</label>
+                    <select id="nuevoEqCategoria"
+                        class="w-full p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold focus:outline-none focus:border-emerald-600">
+                        <option value="Pequeños">Pequeños</option>
+                        <option value="Mediano">Mediano</option>
+                        <option value="Grandes">Grandes</option>
+                        <option value="Seguimiento de línea">Seguimiento de línea</option>
+                        <option value="Evasor de obstáculos">Evasor de obstáculos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Facultad</label>
+                    <input type="text" id="nuevoEqFacultad" placeholder="Ej. FIME"
+                        class="w-full p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-emerald-600">
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="cerrarModalAgregarEquipo()"
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all">Cancelar</button>
+                <button id="btnGuardarNuevoEquipo"
+                    class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/30">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="portal_jueces_backend.js" type="module"></script>
 </body>
+
 </html>
