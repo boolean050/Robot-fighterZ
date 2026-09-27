@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function mostrarPantalla(id) {
-    ['loginForm', 'registroForm', 'pantallaEspera', 'pantallaAdmin'].forEach(p => {
+    ['loginForm', 'registroForm', 'pantallaEspera', 'pantallaAdmin', 'pantallaRegistroExitoso'].forEach(p => {
         const el = document.getElementById(p);
         if(el) el.classList.add('hidden');
     });
@@ -145,15 +145,24 @@ document.getElementById('registroForm').addEventListener('submit', async (e) => 
 
     try {
         await setDoc(doc(db, "maestros_autorizados", nombre), {
-            nombre: nombre,
-            categoria: categoria,
-            password: pass1,
-            sesion_activa: true,
-            fecha_registro: Date.now()
+            nombre: nombre, categoria: categoria, password: pass1,
+            sesion_activa: true, fecha_registro: Date.now()
         });
 
+        // Borrar el "?modo=registro" de la URL para evitar bucles
         window.history.replaceState({}, document.title, window.location.pathname);
-        activarSesionDocente(nombre, categoria);
+        
+        // Configurar los botones de la nueva pantalla intermedia
+        document.getElementById('btnEntrarSala').onclick = () => activarSesionDocente(nombre, categoria);
+        document.getElementById('btnIrLogin').onclick = () => {
+            sessionStorage.clear();
+            mostrarPantalla('loginForm');
+            document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
+        };
+
+        // Mostrar la pantalla de éxito bonita
+        mostrarPantalla('pantallaRegistroExitoso');
+        document.getElementById('subtituloPrincipal').textContent = "Validación Completada";
 
     } catch (error) {
         msg.textContent = "Error creando cuenta.";
@@ -694,3 +703,15 @@ window.eliminarArchivoExcel = async (historialId, fileName) => {
             alert("Error al eliminar el equipo.");
         }
     }
+
+    // --- FUNCION PARA REVELAR CONTRASEÑA (EL OJITO) ---
+window.togglePassword = function(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        btn.textContent = "🙈"; // Cambia al changuito que se tapa los ojos
+    } else {
+        input.type = "password";
+        btn.textContent = "👁️"; // Vuelve al ojito normal
+    }
+};
