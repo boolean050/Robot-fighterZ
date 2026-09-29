@@ -572,6 +572,7 @@ function iniciarRadarArena() {
         } else if (data.estado === 'inactivo') {
             document.getElementById('juez-modo-espera').classList.remove('hidden');
             document.getElementById('juez-modo-combate').classList.add('hidden');
+            document.getElementById('juez-modo-carrera')?.classList.add('hidden');
             if(timerInterval) clearInterval(timerInterval);
             combateTerminado = false;
         } else if (data.estado === 'finalizado') {
@@ -582,6 +583,7 @@ function iniciarRadarArena() {
             document.getElementById('loginForm')?.classList.add('hidden');
             document.getElementById('pantallaEspera')?.classList.add('hidden');
             document.getElementById('pantallaAdmin')?.classList.add('hidden');
+            document.getElementById('juez-modo-carrera')?.classList.add('hidden');
             document.getElementById('juez-modo-combate')?.classList.add('hidden');
             document.getElementById('encabezadoPrincipal')?.classList.add('hidden');
             
@@ -595,35 +597,71 @@ function iniciarRadarArena() {
 
 function activarModoCombate(data) {
     document.getElementById('juez-modo-espera').classList.add('hidden');
-    document.getElementById('juez-modo-combate').classList.remove('hidden');
+    
+    const categoriaJuez = sessionStorage.getItem('juez_categoria') || ''; 
+    const isCarrera = categoriaJuez === 'Evasor' || categoriaJuez === 'Seg. de línea' || categoriaJuez.includes('Línea');
+
+    if (isCarrera) {
+        document.getElementById('juez-modo-combate').classList.add('hidden');
+        document.getElementById('juez-modo-carrera').classList.remove('hidden');
+    } else {
+        document.getElementById('juez-modo-combate').classList.remove('hidden');
+        document.getElementById('juez-modo-carrera').classList.add('hidden');
+    }
     
     document.getElementById('juez-robot1').textContent = data.robot1;
     document.getElementById('eval-robot1-name').textContent = data.robot1;
     document.getElementById('juez-robot2').textContent = data.robot2;
     document.getElementById('eval-robot2-name').textContent = data.robot2;
 
-    if(!combateTerminado && !timerInterval) {
-        iniciarCronometro(data.tiempo_inicio);
-    }
+    // 🔥 EL PARCHE ANTI-TRABAS: Forzamos el reinicio absoluto al entrar a una nueva pelea
+    combateTerminado = false;
+    if(timerInterval) clearInterval(timerInterval);
+    
+    iniciarCronometro(data.tiempo_inicio);
 }
 
-function iniciarCronometro(tiempoInicioServidor) {
-    const crono = document.getElementById('cronometro-juez');
-    const duracionTotal = 5 * 60; 
+// Variables globales para el reloj local (Pégalas justo arriba de la función iniciarCronometro)
+let idPeleaActual = null;
+let tiempoInicioLocal = 0;
 
+function iniciarCronometro(tiempoInicioServidor) {
+    // 1. REINICIAMOS LAS VARIABLES DE CONTROL
+    combateTerminado = false; 
+    
+    // 2. BLOQUEAMOS EL BOTÓN
+    const btn = document.getElementById('btnEnviarVeredicto');
+    if (btn) {
+        btn.disabled = true;
+        btn.className = "w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest shadow-sm cursor-not-allowed transition-all";
+        btn.innerHTML = "⏳ ESPERANDO FIN DE PELEA...";
+    }
+
+    // 🔥 MAGIA ANTI-SALTOS DE RELOJ: 
+    // Usamos el "tiempoInicioServidor" solo como un ID para saber si es una pelea nueva.
+    // Si lo es, tomamos la hora LOCAL de este dispositivo como el segundo cero exacto.
+    if (idPeleaActual !== tiempoInicioServidor) {
+        idPeleaActual = tiempoInicioServidor;
+        tiempoInicioLocal = Date.now() / 1000;
+    }
+
+    let duracionTotal = 300; // 🔥 5 MINUTOS EXACTOS (300 segundos)
+
+    // 3. ARRANCAMOS EL RELOJ
     timerInterval = setInterval(() => {
-        const ahora = Date.now() / 1000; 
-        const transcurrido = ahora - tiempoInicioServidor;
-        const restante = duracionTotal - transcurrido;
+        let ahora = Date.now() / 1000; 
+        let transcurrido = ahora - tiempoInicioLocal;
+        let restante = duracionTotal - transcurrido;
 
         if (restante <= 0) {
             clearInterval(timerInterval);
-            crono.textContent = "00:00";
+            document.getElementById('cronometro-juez').textContent = "00:00";
             finalizarCombateNatural();
         } else {
             let m = Math.floor(restante / 60);
             let s = Math.floor(restante % 60);
-            crono.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            document.getElementById('cronometro-juez').textContent = 
+                `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
     }, 1000);
 }
@@ -664,29 +702,65 @@ window.modificarPuntos = function(id, cantidad) {
 document.getElementById('btnEnviarVeredicto')?.addEventListener('click', async () => {
     if(!confirm("¿Estás seguro de enviar tu evaluación oficial?")) return;
     
+    const r1Name = document.getElementById('juez-robot1').textContent;
+    const r2Name = document.getElementById('juez-robot2').textContent;
+
     const payload = {
         juez: currentUser,
         categoria: catMap[currentCategory],
-        robot1: document.getElementById('juez-robot1').textContent,
-        robot2: document.getElementById('juez-robot2').textContent,
+        robot1: r1Name,
+        robot2: r2Name,
         puntos: puntos,
         timestamp: Date.now()
     };
 
     try {
+        // 1. Guardamos el historial del veredicto (Lo que ya hacías)
         await addDoc(collection(db, "veredictos"), payload);
+
+        // 🔥 2. EL PUENTE A LA TABLA: Sumamos los puntos al perfil del robot en 'competidores'
+        // NOTA: Aquí estoy sumando Golpes + Saques = 1 punto cada uno. 
+        // Si los saques valen más, cámbialo aquí, ej: puntos.r1Golpes + (puntos.r1Saques * 3)
+        const totalR1 = puntos.r1Golpes + puntos.r1Saques; 
+        const totalR2 = puntos.r2Golpes + puntos.r2Saques;
+
+        // Buscamos a Robot 1 en el padrón y le sumamos sus puntos
+        const snap1 = await getDocs(query(collection(db, "competidores"), where("nombre", "==", r1Name)));
+        snap1.forEach(d => {
+            let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
+            updateDoc(d.ref, { score: actual + totalR1 }); // Actualiza la BD real
+        });
+
+        // Buscamos a Robot 2 en el padrón y le sumamos sus puntos
+        const snap2 = await getDocs(query(collection(db, "competidores"), where("nombre", "==", r2Name)));
+        snap2.forEach(d => {
+            let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
+            updateDoc(d.ref, { score: actual + totalR2 }); // Actualiza la BD real
+        });
+
+        // 3. Limpieza de pantalla del juez
         alert("Veredicto enviado exitosamente. Gracias por tu evaluación.");
         document.getElementById('juez-modo-espera').classList.remove('hidden');
         document.getElementById('juez-modo-combate').classList.add('hidden');
+        document.getElementById('juez-modo-carrera')?.classList.add('hidden');
         combateTerminado = false;
         puntos = { r1Golpes: 0, r1Saques: 0, r2Golpes: 0, r2Saques: 0 };
-        ['r1-golpes','r1-saques','r2-golpes','r2-saques'].forEach(id => document.getElementById(id).textContent = "0");
+        
+        ['r1-golpes','r1-saques','r2-golpes','r2-saques'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.textContent = "0";
+        });
         
         const btn = document.getElementById('btnEnviarVeredicto');
-        btn.disabled = true;
-        btn.className = "w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest cursor-not-allowed transition-colors";
-        btn.innerHTML = "⏳ Esperando fin de combate...";
-    } catch(e) { alert("Error enviando veredicto"); }
+        if (btn) {
+            btn.disabled = true;
+            btn.className = "w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest cursor-not-allowed transition-colors";
+            btn.innerHTML = "⏳ Esperando fin de combate...";
+        }
+    } catch (error) {
+        console.error("🔥 ERROR REAL DE FIREBASE:", error);
+        alert("Error enviando veredicto. Revisa la consola F12.");
+    }
 });
 
 
@@ -911,7 +985,7 @@ document.getElementById('btnDescargarPlantilla')?.addEventListener('click', () =
         ["", "Los pequeñines danix", "Medianos", "FIME"]
     ]);
     XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
-    XLSX.writeFile(wb, "padron_equipos.xlsx");
+    XLSX.writeFile(wb, "plantilla_padron_equipos.xlsx");
 });
 
 // --- BOTÓN DE SALIR DEL PANEL DE ADMIN ---
@@ -1097,3 +1171,54 @@ document.getElementById('btnGuardarNuevoEquipo')?.addEventListener('click', asyn
     }
 });
 
+// --- PUENTE HACIA LOS BRACKETS ---
+document.getElementById('btnIrABrackets')?.addEventListener('click', () => {
+    const miCat = sessionStorage.getItem('juez_categoria');
+    if (!miCat) return alert("Error: No tienes categoría asignada.");
+    const tag = obtenerTagExacto(miCat);
+    window.location.href = `brackets.html?cat=${tag}`;
+});
+
+// =====================================================================
+// RECEPTOR DE RADIO DESDE LOS BRACKETS (AISLADO POR ROLES)
+// =====================================================================
+const canalPanel = new BroadcastChannel('fime_torneo_canal');
+
+canalPanel.onmessage = function(evento) {
+    if (evento.data.accion === 'cargar_pelea') {
+        const { cat, r1, r2 } = evento.data;
+
+        // 🛡️ ESCUDOS DE AISLAMIENTO 🛡️
+        const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+        const miCat = sessionStorage.getItem('juez_categoria');
+        
+        // 1. Si eres Súper Admin, ignoras la señal (tú controlas todo manual)
+        if (isSuperAdmin) return;
+        
+        // 2. Si eres Admin normal, solo aceptas la señal si es de tu propia categoría
+        if (obtenerTagExacto(miCat) !== obtenerTagExacto(cat)) return;
+
+        console.log(`📡 Señal recibida y aceptada: ${cat} -> ${r1} VS ${r2}`);
+
+        const selectR1 = document.getElementById('admin-r1-input'); 
+        const selectR2 = document.getElementById('admin-r2-input'); 
+        const selectCat = document.getElementById('admin-categoria'); 
+
+        if (!selectR1 || !selectR2) return;
+
+        if (selectCat) {
+            Array.from(selectCat.options).forEach(opt => {
+                if(opt.value.toLowerCase() === cat.toLowerCase() || opt.text.toLowerCase() === cat.toLowerCase()) {
+                    selectCat.value = opt.value;
+                }
+            });
+            selectCat.dispatchEvent(new Event('change')); 
+        }
+        
+        setTimeout(() => {
+            selectR1.value = r1;
+            selectR2.value = r2;
+            console.log(`✅ ¡Pelea auto-cargada para el Admin de ${cat}!`);
+        }, 500);
+    }
+};

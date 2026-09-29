@@ -1,41 +1,62 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, getDocs, query, where, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDO5C61Kx2E1p4zJ8YdRGaPCD7UYro0dwc",
+    authDomain: "robot-fighterz.firebaseapp.com",
+    projectId: "robot-fighterz",
+    storageBucket: "robot-fighterz.firebasestorage.app",
+    messagingSenderId: "474556243025",
+    appId: "1:474556243025:web:3aae6cbf276aa984a3ac70"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+
+
 // =====================================================================
-// MOTOR CORE OPTIMIZADO - BRACKETS CLÁSICOS (IZQUIERDA A DERECHA)
+// MOTOR CORE OPTIMIZADO - BRACKETS CLÁSICOS
 // =====================================================================
 
 if (!document.getElementById('classic-bracket-styles')) {
     const style = document.createElement('style');
     style.id = 'classic-bracket-styles';
     style.innerHTML = `
-        .bracket-wrapper { display: flex; flex-direction: row; align-items: stretch; justify-content: flex-start; overflow-x: auto; padding: 2rem 4rem; min-height: 75vh; gap: 3rem; background: #f8fafc; }
-        .bracket-col { display: flex; flex-direction: column; justify-content: space-around; position: relative; min-width: 250px; gap: 1rem; }
+        /* ALINEACIÓN SUPERIOR: Evita que se estiren feo con el zoom */
+        .bracket-wrapper { display: flex; flex-direction: row; align-items: flex-start; justify-content: safe center; padding: 4rem; min-height: 100%; min-width: max-content; background: transparent; }
         
-        .match-container { display: flex; flex-direction: column; justify-content: center; position: relative; flex: 1; padding: 10px 0; }
-
-        /* Líneas horizontales tipo Bracket Clásico */
-        .match-container::after { content: ''; position: absolute; right: -3rem; top: 50%; width: 3rem; height: 2px; background-color: #94a3b8; z-index: 0; }
-        .bracket-col:last-child .match-container::after { display: none; } /* El campeón no saca línea */
+        /* ANCLAJE ARRIBA Y GAP FIJO: Las tarjetas siempre estarán al mismo nivel horizontal */
+        .bracket-col { display: flex; flex-direction: column; justify-content: flex-start; position: relative; min-width: 280px; gap: 1.5rem; margin: 0 1.75rem; flex-shrink: 0; }
         
-        .match-container::before { content: ''; position: absolute; left: -3rem; top: 50%; width: 3rem; height: 2px; background-color: #94a3b8; z-index: 0; }
-        .bracket-col:first-child .match-container::before { display: none; } /* La primera ronda no recibe línea */
+        .match-container { display: flex; flex-direction: column; justify-content: center; position: relative; width: 100%; }
 
-        /* Diseño de la tarjeta apilada tipo eSports */
-        .match-card { background: white; border: 2px solid #e2e8f0; border-radius: 8px; display: flex; flex-direction: column; z-index: 10; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; width: 100%; }
-        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 2px solid #f1f5f9; cursor: pointer; transition: all 0.2s ease; }
+        /* LÍNEAS MODO ESPEJO (Solo Fase 2) */
+        .phase-2-tree .col-left .match-container::after { content: ''; position: absolute; right: -3.5rem; top: 50%; width: 3.5rem; height: 3px; background-color: #cbd5e1; z-index: 0; }
+        .phase-2-tree .col-right .match-container::before { content: ''; position: absolute; left: -3.5rem; top: 50%; width: 3.5rem; height: 3px; background-color: #cbd5e1; z-index: 0; }
+
+        .match-card { background: white; border: 2px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; z-index: 10; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; width: 100%; transition: all 0.2s ease; }
+        .match-card:hover { box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1); border-color: #cbd5e1; transform: translateY(-2px); }
+        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #f1f5f9; cursor: pointer; transition: all 0.2s ease; min-height: 52px; }
         .player-row:last-child { border-bottom: none; }
-        .player-row:hover { background: #f1f5f9; }
-        
-        /* Estilos cuando un jugador gana */
-        .player-row.winner { background: #10b981; color: white; border-color: #059669; }
+        .player-row:hover { background: #f8fafc; }
+        .player-row.winner { background: #10b981; border-color: #059669; }
+        .player-row.winner .player-name { color: white; }
         .player-row.winner .docente-text { color: #d1fae5; }
-        .player-row.winner .score-box { background: rgba(255,255,255,0.2); color: white; }
         
+        /* DISEÑO AMARILLO PLÁTANO - REPECHAJE */
+        .player-row.winner-rep { background: #fef08a !important; border-color: #f59e0b !important; }
+        .player-row.winner-rep .player-name { color: #78350f !important; }
+        .player-row.winner-rep .docente-text { color: #92400e !important; }
+
         .player-info { display: flex; flex-direction: column; overflow: hidden; }
-        .player-name { font-weight: 900; font-size: 0.85rem; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; letter-spacing: 0.5px; }
-        .docente-text { font-size: 0.6rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-top: 3px; letter-spacing: 0.5px; }
-        .score-box { font-size: 0.8rem; font-weight: 900; background: #f1f5f9; color: #cbd5e1; padding: 3px 8px; border-radius: 6px; }
+        .player-name { font-weight: 900; font-size: 0.85rem; color: #1e293b; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+        .docente-text { font-size: 0.6rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; margin-top: 3px; }
+        .score-box { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 0.9rem; border-radius: 6px; background: transparent; }
     `;
     document.head.appendChild(style);
 }
+
 
 const tournamentData = {
     pequenos: { participants: [], phase: 'round1', round1Matches: [], byePlayer: null, repechageMatches: [], laterRounds: [], champion: null },
@@ -45,44 +66,165 @@ const tournamentData = {
 const timeData = { seguimiento: [], evasor: [] };
 const timeParticipants = { seguimiento: [], evasor: [] };
 let docentesMap = {}; 
+let currentSubView = 'menu'; // 🔥 NUEVA VARIABLE PARA RECORDAR DÓNDE ESTAMOS
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 🛡️ TRUCO: Bloquear el botón físico de "Atrás" del celular o navegador
+    history.pushState(null, null, window.location.href);
+    window.onpopstate = function () {
+        history.go(1);
+    };
+
     cargarDatosDesdeServidor();
 });
 
+
+
 function cargarDatosDesdeServidor() {
-    fetch('/api/competidores/obtener_todos')
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            ['pequenos','mediano','grandes'].forEach(c => tournamentData[c].participants = []);
-            timeParticipants.seguimiento = []; timeParticipants.evasor = [];
-            timeData.seguimiento = []; timeData.evasor = [];
-            docentesMap = {};
+    onSnapshot(collection(db, "competidores"), (snapshot) => {
+        // 🔥 LIMPIEZA SEGURA: Solo vaciamos los nombres y puntos, INTOCABLES las llaves y ganadores
+        ['pequenos', 'mediano', 'grandes'].forEach(cat => {
+            if (!tournamentData[cat]) {
+                tournamentData[cat] = { participants: [], round1Matches: [], repechageMatches: [], laterRounds: [], phase: 'round1', puntosTotales: {} };
+            } else {
+                tournamentData[cat].participants = [];
+                tournamentData[cat].puntosTotales = {}; 
+                // NO tocamos round1Matches ni laterRounds aquí
+            }
+        });
 
-            data.competidores.forEach(c => {
-                docentesMap[c.nombre] = c.docente || 'Sin Asesor'; 
-                if (['pequenos','mediano','grandes'].includes(c.categoria_tag)) {
-                    tournamentData[c.categoria_tag].participants.push(c.nombre);
-                } else {
-                    timeParticipants[c.categoria_tag].push(c.nombre);
-                }
-            });
+        // 2. Extraemos los robots de Firebase con TRADUCTOR BLINDADO
+        snapshot.forEach(docSnap => {
+            const c = docSnap.data();
+            docentesMap[c.nombre] = c.docente || c.facultad || 'Sin Asesor'; 
+            
+            // Atrapamos cualquier variación (mayúsculas, acentos, vieja versión)
+            let textoFiltro = (c.categoria_tag || c.categoria_original || c.categoria || '').toLowerCase();
+            let tagReal = '';
+            
+            if (textoFiltro.includes('peque')) tagReal = 'pequenos';
+            else if (textoFiltro.includes('median')) tagReal = 'mediano';
+            else if (textoFiltro.includes('grand')) tagReal = 'grandes';
 
-            data.tiempos.forEach(t => timeData[t.categoria_tag].push(t));
+            if (['pequenos','mediano','grandes'].includes(tagReal)) {
+                tournamentData[tagReal].participants.push(c.nombre);
+                
+                // 🧠 MAGIA DE PUNTOS: Inicializamos el cajón de puntos si no existe, y guardamos lo que viene de Firebase
+                if (!tournamentData[tagReal].puntosTotales) tournamentData[tagReal].puntosTotales = {};
+                
+                // Atrapamos los puntos sin importar si en tu Firebase la columna se llama "puntos", "puntaje" o "score"
+                tournamentData[tagReal].puntosTotales[c.nombre] = Number(c.puntos || c.puntaje || c.score || 0);
+            }
+        });
 
-            ['pequenos','mediano','grandes'].forEach(c => {
-                if (tournamentData[c].participants.length >= 2 && tournamentData[c].round1Matches.length === 0) {
-                    generateInitialMatches(c);
+        
+        
+        // 4. LÓGICA DE PERMISOS: SÚPER ADMIN vs ADMIN NORMAL
+        const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+        const miCat = sessionStorage.getItem('juez_categoria');
+        
+        const catMap = { "Pequeños": "pequenos", "Mediano": "mediano", "Medianos": "mediano", "Grandes": "grandes", "Seguimiento de línea": "seguimiento", "Evasor de obstáculos": "evasor" };
+        const myViewId = catMap[miCat] || "pequenos"; 
+        const todasLasTarjetas = ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'];
+        const contenedorTarjetas = document.querySelector('#view-menu > div:nth-of-type(2)');
+
+        if (!isSuperAdmin) {
+            // ADMIN NORMAL: Vista enfocada en su categoría (Lobby centrado)
+            // Si ya hay una pantalla abierta (ej. Las llaves), no fuerces el menú de nuevo
+            if (!document.querySelector('.view.active')) {
+                document.getElementById('view-menu').classList.add('active');
+            }
+            if (contenedorTarjetas) contenedorTarjetas.className = "flex justify-center w-full";
+            
+            todasLasTarjetas.forEach(cat => {
+                const tarjeta = document.querySelector(`[onclick="openCategory('${cat}')"]`);
+                if (tarjeta) {
+                    if (cat === myViewId) {
+                        tarjeta.style.display = 'block'; 
+                        tarjeta.classList.add('w-full', 'max-w-sm'); 
+                    } else {
+                        tarjeta.style.display = 'none'; 
+                    }
                 }
             });
             
-            const activeView = document.querySelector('.view.active').id.replace('view-', '');
-            if(['pequenos', 'mediano', 'grandes'].includes(activeView)) renderTournament(activeView);
-            if(['seguimiento', 'evasor'].includes(activeView)) renderTimeTable(activeView);
+            const btnInternalBack = document.getElementById('btnBack');
+            if (btnInternalBack) {
+                btnInternalBack.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Regresar al Lobby`;
+            }
+        } else {
+            // SÚPER ADMIN: Vista completa con todas las tarjetas
+            // Si ya hay una pantalla abierta (ej. Las llaves), no fuerces el menú de nuevo
+            if (!document.querySelector('.view.active')) {
+                document.getElementById('view-menu').classList.add('active');
+            }
+            if (contenedorTarjetas) contenedorTarjetas.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
+            
+            todasLasTarjetas.forEach(cat => {
+                const tarjeta = document.querySelector(`[onclick="openCategory('${cat}')"]`);
+                if (tarjeta) {
+                    tarjeta.style.display = 'block';
+                    tarjeta.classList.remove('w-full', 'max-w-sm'); 
+                }
+            });
+            
+            const btnInternalBack = document.getElementById('btnBack');
+            if (btnInternalBack) {
+                btnInternalBack.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Menú Principal`;
+            }
+            
+            // Si el súper admin entra por link directo, lo mandamos a esa categoría
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoCat = urlParams.get('cat');
+            if(autoCat && todasLasTarjetas.includes(autoCat)) {
+                openCategory(autoCat); 
+            }
         }
+        
+        // 5. Refrescar el árbol visual en tiempo real
+        const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+        if(['pequenos', 'mediano', 'grandes'].includes(activeView)) {
+            renderTournament(activeView, currentSubView);
+        }
+    }); // <--- 🔥 AQUÍ CERRAMOS EL RADAR DE COMPETIDORES
+
+    // 🔥 SEGUNDO RADAR: BRACKETS EN TIEMPO REAL (Totalmente independiente)
+    onSnapshot(collection(db, "brackets_estado"), (snap) => {
+        // 1. EL EFECTO LOBBY: Si el Súper Admin borra la BD, expulsa a todos
+        snap.docChanges().forEach(change => {
+            if (change.type === "removed") {
+                const catBorrada = change.doc.id;
+                const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+                
+                if (activeView === catBorrada) {
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                    document.getElementById('view-menu').classList.add('active');
+                    alert("⚠️ El Súper Admin ha reiniciado este torneo. Regresando al Lobby.");
+                }
+            }
+        });
+
+        // 2. ACTUALIZACIÓN NORMAL DE LLAVES
+        snap.forEach(docSnap => {
+            const cat = docSnap.id;
+            const data = docSnap.data();
+            if (tournamentData[cat]) {
+                tournamentData[cat].round1Matches = data.round1Matches || [];
+                tournamentData[cat].repechageMatches = data.repechageMatches || [];
+                tournamentData[cat].laterRounds = data.laterRounds || [];
+                tournamentData[cat].champion = data.champion || null;
+                tournamentData[cat].byePlayer = data.byePlayer || null;
+                tournamentData[cat].phase = data.phase || 'round1';
+
+                const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+                if (activeView === cat && typeof currentSubView !== 'undefined') {
+                    renderTournament(cat, currentSubView);
+                }
+            }
+        });
     });
-}
+} // <--- 🔥 AQUÍ TERMINA LA FUNCIÓN cargarDatosDesdeServidor()
+
 
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -98,99 +240,208 @@ window.openCategory = (cat) => {
     else renderTimeTable(cat);
 };
 
-// --- ALGORITMO CORE ---
+// =====================================================================
+// --- ALGORITMO CORE: GRUPOS Y REPECHAJE INSTANTÁNEO ---
+// =====================================================================
 
 function generateInitialMatches(cat) {
     const data = tournamentData[cat];
     if (data.participants.length < 2) return;
     
+    // 🔥 MAGIA ANTI-F5: Intentar recuperar el torneo guardado
+    const guardado = localStorage.getItem('fime_bracket_' + cat);
+    if (guardado) {
+        const parseado = JSON.parse(guardado);
+        // Si nadie ha agregado o borrado robots del padrón, restauramos las peleas exactas
+        if (parseado.participants && parseado.participants.length === data.participants.length) {
+            data.round1Matches = parseado.round1Matches;
+            data.repechageMatches = parseado.repechageMatches;
+            data.laterRounds = parseado.laterRounds;
+            data.champion = parseado.champion;
+            data.byePlayer = parseado.byePlayer;
+            data.phase = parseado.phase;
+            return; // Detenemos la función aquí para no volver a barajarlos
+        }
+    }
+
     const shuffled = [...data.participants].sort(() => Math.random() - 0.5);
     data.byePlayer = shuffled.length % 2 !== 0 ? shuffled.pop() : null;
-    data.round1Matches = [];
     
+    data.round1Matches = [];
+    data.repechageMatches = [];
+    data.laterRounds = [];
+    data.champion = null;
+    data.phase = 'phase1';
+    
+    // Armar Ronda 1 pura (Solo pares)
     for (let i = 0; i < shuffled.length; i += 2) {
         data.round1Matches.push({ player1: shuffled[i], player2: shuffled[i + 1], winner: null });
     }
-    data.phase = 'round1';
-}
 
-function checkAndAdvance(data) {
-    if (data.phase === 'round1' && data.round1Matches.every(m => m.winner !== null)) {
-        const losers = [];
-        data.round1Matches.forEach(m => losers.push(m.winner === m.player1 ? m.player2 : m.player1));
-        if (data.byePlayer) losers.push(data.byePlayer);
-        
-        if (losers.length >= 2) {
-            data.byePlayer = losers.length % 2 !== 0 ? losers.pop() : null;
-            data.repechageMatches = [];
-            for (let i = 0; i < losers.length; i += 2) {
-                data.repechageMatches.push({ player1: losers[i], player2: losers[i + 1], winner: null });
-            }
-            data.phase = 'repechage';
-        } else { buildNextRound(data); }
-    } 
-    else if (data.phase === 'repechage' && data.repechageMatches.every(m => m.winner !== null)) {
-        buildNextRound(data);
-    } 
-    else if (data.phase === 'laterRounds') {
-        const currentRound = data.laterRounds[data.laterRounds.length - 1];
-        if (currentRound && currentRound.every(m => m.winner !== null)) {
-            const winners = currentRound.map(m => m.winner);
-            if (winners.length === 1) {
-                data.champion = winners[0];
-                data.phase = 'finished';
-            } else { buildNextRound(data); }
+    // Calcular cajas exactas de Repechaje (Perdedores R1 + El Impar)
+    const numR1 = data.round1Matches.length;
+    const totalRepPlayers = numR1 + (data.byePlayer ? 1 : 0);
+    const numRepBoxes = Math.ceil(totalRepPlayers / 2);
+
+    for (let i = 0; i < numRepBoxes; i++) {
+        data.repechageMatches.push({ player1: null, player2: null, winner: null });
+    }
+
+    // MAGIA: Sienta al Impar directamente en su lugar de Repechaje desde el inicio
+    if (data.byePlayer) {
+        const byeBoxIdx = Math.floor(numR1 / 2);
+        if (numR1 % 2 === 0) {
+            data.repechageMatches[byeBoxIdx].player1 = data.byePlayer;
+        } else {
+            data.repechageMatches[byeBoxIdx].player2 = data.byePlayer;
         }
     }
+
+    guardarBracketFirebase(cat);
 }
 
-function buildNextRound(data) {
-    const winnersR1 = data.round1Matches.map(m => m.winner).filter(w => w !== null);
-    const winnersRep = (data.repechageMatches || []).map(m => m.winner).filter(w => w !== null);
-    const allWinners = [...winnersR1, ...winnersRep];
-    
-    if (data.byePlayer) allWinners.push(data.byePlayer);
+function checkPhase1Completion(data) {
+    const r1Done = data.round1Matches.every(m => m.winner !== null);
+    if (!r1Done) return; 
 
-    if (allWinners.length < 2) {
-        data.champion = allWinners[0] || null;
-        data.phase = 'finished';
-        return;
-    }
+    data.repechageMatches.forEach(m => {
+        if (m.player1 && !m.player2) m.winner = m.player1;
+        if (!m.player1 && m.player2) m.winner = m.player2;
+        if (!m.player1 && !m.player2) m.winner = 'EMPTY';
+    });
 
-    const nextPlayers = [...allWinners];
-    data.byePlayer = nextPlayers.length % 2 !== 0 ? nextPlayers.pop() : null;
-    
-    const nextMatches = [];
-    for (let i = 0; i < nextPlayers.length; i += 2) {
-        nextMatches.push({ player1: nextPlayers[i], player2: nextPlayers[i + 1], winner: null });
+    const repDone = data.repechageMatches.every(m => m.winner !== null);
+
+    if (r1Done && repDone && data.laterRounds.length === 0) {
+        buildPhase2Bracket(data);
     }
-    data.laterRounds.push(nextMatches);
-    data.phase = 'laterRounds';
 }
 
-window.selectWinner = function(cat, phase, matchIndex, playerName) {
+function buildPhase2Bracket(data) {
+    // 🔥 CANDADO ANTI-RANDOM: Si ya hay llaves de eliminatoria creadas, no las revuelvas
+    if (data.laterRounds && data.laterRounds.length > 0) return;
+    
+    let allWinners = [];
+    data.round1Matches.forEach(m => { if(m.winner && m.winner !== 'EMPTY') allWinners.push(m.winner); });
+    data.repechageMatches.forEach(m => { if(m.winner && m.winner !== 'EMPTY') allWinners.push(m.winner); });
+
+    const totalExpectedRounds = Math.ceil(Math.log2(allWinners.length));
+    const bracketSize = Math.pow(2, totalExpectedRounds);
+
+    while (allWinners.length < bracketSize) {
+        allWinners.push(null); 
+    }
+    
+    allWinners.sort(() => Math.random() - 0.5); 
+
+    let currentRound = [];
+    for (let i = 0; i < bracketSize; i += 2) {
+        currentRound.push({ player1: allWinners[i], player2: allWinners[i+1], winner: null, isBye: (!allWinners[i] || !allWinners[i+1]) });
+    }
+    data.laterRounds.push(currentRound);
+
+    let prevMatchCount = currentRound.length;
+    while(prevMatchCount > 1) {
+        prevMatchCount = prevMatchCount / 2;
+        let emptyRound = [];
+        for(let i=0; i<prevMatchCount; i++) emptyRound.push({ player1: null, player2: null, winner: null });
+        data.laterRounds.push(emptyRound);
+    }
+
+    data.laterRounds[0].forEach(m => {
+        if (m.player1 && !m.player2) { m.winner = m.player1; m.isBye = true; }
+        if (m.player2 && !m.player1) { m.winner = m.player2; m.isBye = true; }
+    });
+
+    updateLaterRoundsCascading(data);
+}
+
+function updateLaterRoundsCascading(data) {
+    for (let r = 0; r < data.laterRounds.length; r++) {
+        const currentRound = data.laterRounds[r];
+        if (r < data.laterRounds.length - 1) {
+            const nextRound = data.laterRounds[r+1];
+            for (let i = 0; i < currentRound.length; i++) {
+                const match = currentRound[i];
+                const nextMatchIdx = Math.floor(i / 2);
+                const isPlayer1 = i % 2 === 0;
+
+                if (isPlayer1) nextRound[nextMatchIdx].player1 = match.winner;
+                else nextRound[nextMatchIdx].player2 = match.winner;
+
+                if (!match.winner) {
+                    if (nextRound[nextMatchIdx].winner === (isPlayer1 ? nextRound[nextMatchIdx].player1 : nextRound[nextMatchIdx].player2)) {
+                        nextRound[nextMatchIdx].winner = null;
+                    }
+                }
+            }
+        }
+    }
+    const lastRound = data.laterRounds[data.laterRounds.length - 1];
+    data.champion = lastRound[0].winner;
+}
+
+window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
     const data = tournamentData[cat];
     let match;
-    
-    if (phase === 'round1') match = data.round1Matches[matchIndex];
-    else if (phase === 'repechage') match = data.repechageMatches[matchIndex];
-    else if (phase === 'laterRounds') {
-        if (!data.laterRounds[matchIndex[0]]) return;
-        match = data.laterRounds[matchIndex[0]][matchIndex[1]];
-    }
-    
-    if (!match || match.player1 === null) return; 
+
+    if (phase === 'round1') match = data.round1Matches[matchIdx];
+    else if (phase === 'repechage') match = data.repechageMatches[matchIdx];
+    else if (phase === 'laterRounds') match = data.laterRounds[matchIdx[0]][matchIdx[1]];
+
+    if (!match || (!match.player1 && phase !== 'repechage') || match.isBye) return;
 
     match.winner = match.winner === playerName ? null : playerName;
-    checkAndAdvance(data);
-    renderTournament(cat);
+
+    if (phase === 'round1') {
+        const loser = match.winner === match.player1 ? match.player2 : (match.winner === match.player2 ? match.player1 : null);
+        const repMatchIdx = Math.floor(matchIdx / 2);
+        const isPlayer1 = matchIdx % 2 === 0;
+        const repMatch = data.repechageMatches[repMatchIdx];
+
+        if (repMatch) {
+            if (isPlayer1) {
+                repMatch.player1 = loser;
+                if (!loser && repMatch.winner === repMatch.player1) repMatch.winner = null;
+            } else {
+                repMatch.player2 = loser;
+                if (!loser && repMatch.winner === repMatch.player2) repMatch.winner = null;
+            }
+        }
+    }
+
+    if (phase === 'round1' || phase === 'repechage') checkPhase1Completion(data);
+    else updateLaterRoundsCascading(data);
+
+    // 🛑 TRUCO DEFINITIVO (SIN PARPADEO):
+    const bracketArea = document.getElementById('bracket-area');
+    const scrollX = bracketArea ? bracketArea.scrollLeft : 0;
+    const scrollYInternal = bracketArea ? bracketArea.scrollTop : 0;
+    
+    // Congelamos la altura exacta para que la página no brinque ni un milímetro
+    const container = document.getElementById('tournament-' + cat);
+    if (container) container.style.height = container.offsetHeight + 'px'; 
+
+    // Actualizamos los datos
+    renderTournament(cat, subView);
+
+    // Restauramos TODO instantáneamente (sin setTimeout)
+    const newBracketArea = document.getElementById('bracket-area');
+    if (newBracketArea) {
+        newBracketArea.scrollLeft = scrollX;
+        newBracketArea.scrollTop = scrollYInternal;
+    }
+    if (container) container.style.height = ''; // Descongelamos altura
+
+    guardarBracketFirebase(cat);
 };
 
 // =====================================================================
-// RENDERIZADO VISUAL: ÁRBOL CLÁSICO DE IZQUIERDA A DERECHA
+// RENDERIZADO VISUAL CON SUB-MENÚ DE FASES
 // =====================================================================
 
-function renderTournament(cat) {
+window.renderTournament = function renderTournament(cat, subView = 'menu') {
+    currentSubView = subView; // 🔥 GUARDAMOS LA PANTALLA ACTUAL
     const container = document.getElementById('tournament-' + cat);
     const data = tournamentData[cat];
     if (!container) return;
@@ -199,94 +450,258 @@ function renderTournament(cat) {
         container.innerHTML = `<div class="text-center p-12 bg-white rounded-3xl border border-gray-200 shadow-sm w-full max-w-4xl mx-auto"><span class="text-6xl block mb-4">📭</span><h3 class="text-2xl font-black text-gray-400 uppercase tracking-widest">Categoría Vacía</h3><p class="text-gray-400 font-bold mt-2">Sube tu padrón desde el Panel Admin.</p></div>`;
         return;
     }
-    if (data.participants.length === 1) {
-        container.innerHTML = `<div class="text-center p-12 bg-white rounded-3xl border-2 border-amber-300 shadow-sm w-full max-w-4xl mx-auto"><span class="text-6xl block mb-4">⚠️</span><h3 class="text-2xl font-black text-amber-500 uppercase tracking-widest">Faltan Competidores</h3><p class="text-gray-600 font-bold mt-2 text-lg">Solo hay 1 robot inscrito.</p></div>`;
+
+    const adminName = sessionStorage.getItem('juez_nombre') || 'Administrador';
+    const isPhase2Unlocked = data.laterRounds && data.laterRounds.length > 0;
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+
+    if (subView === 'menu') {
+        let html = `
+        <div class="w-full max-w-4xl mx-auto mt-4 mb-8">
+            <div class="text-center mb-10 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-emerald-600"></div>
+                <h2 class="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight">${adminName}</h2>
+                <h3 class="text-sm md:text-base font-bold text-emerald-600 uppercase tracking-widest mt-1">Gestión - Categoría ${cat}</h3>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div onclick="renderTournament('${cat}', 'phase1')" class="bg-white border-2 border-transparent hover:border-emerald-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative group">
+                    <span class="text-5xl block mb-4 group-hover:scale-110 transition-transform">⚔️</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight uppercase">Fase Inicial</h3>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Grupos y Repechaje</p>
+                    <span class="inline-block mt-4 px-4 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Desbloqueado</span>
+                </div>
+
+                <div onclick="${isPhase2Unlocked ? `renderTournament('${cat}', 'phase2')` : ''}" class="bg-white border-2 border-transparent ${isPhase2Unlocked ? 'hover:border-amber-400 cursor-pointer hover:shadow-xl hover:-translate-y-2' : 'opacity-60 cursor-not-allowed grayscale'} rounded-2xl p-8 text-center shadow-md transition-all transform relative group">
+                    <span class="text-5xl block mb-4 ${isPhase2Unlocked ? 'group-hover:scale-110 transition-transform' : ''}">🏆</span>
+                    <h3 class="text-xl font-extrabold text-gray-800 tracking-tight uppercase">Eliminatorias</h3>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Ronda 2 hasta la Final</p>
+                    ${isPhase2Unlocked 
+                        ? `<span class="inline-block mt-4 px-4 py-1 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wider">¡Listo para iniciar!</span>`
+                        : `<span class="inline-block mt-4 px-4 py-1 bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold rounded-full uppercase tracking-wider flex items-center justify-center gap-1 mx-auto w-max"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg> Termina la Fase Inicial</span>`
+                    }
+                </div>
+            </div>
+            
+            ${isSuperAdmin ? `
+            <div class="mt-8 text-center">
+                <button class="text-red-500 hover:text-red-700 font-bold text-xs uppercase tracking-widest underline transition-colors" onclick="resetTournament('${cat}')">
+                    🔄 Reiniciar Todo el Torneo
+                </button>
+            </div>` : ''}
+        </div>`;
+        container.innerHTML = html;
         return;
     }
 
-    // Calculamos rondas vacías para dibujar el árbol hasta la final
-    const totalExpectedRounds = Math.ceil(Math.log2(data.participants.length));
-    let renderLaterRounds = [...data.laterRounds];
-    let lastMatchCount = renderLaterRounds.length > 0 ? renderLaterRounds[renderLaterRounds.length - 1].length : data.round1Matches.length;
+    // --- BARRA DE BOTONES (Centrada y ajustada) ---
+    const isArena = !!document.fullscreenElement;
+    let html = `
+    <div id="arena-header" class="mb-6 w-full grid grid-cols-3 items-center bg-white p-3 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
+        <div class="flex justify-start">
+            <button onclick="abrirModalPuntajes('${cat}')" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+                📊 Tabla de Puntajes
+            </button>
+        </div>
+        <div class="flex justify-center">
+            <button onclick="activarModoArena()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+                🖥️ Modo Arena
+            </button>
+        </div>
+        <div class="flex justify-end">
+            <button onclick="renderTournament('${cat}', 'menu')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+                🔙 Menú Eliminatorias
+            </button>
+        </div>
+    </div>
 
-    while (renderLaterRounds.length < totalExpectedRounds - 1 && lastMatchCount > 1) {
-        lastMatchCount = Math.ceil(lastMatchCount / 2);
-        let emptyRound = [];
-        for(let i=0; i<lastMatchCount; i++) emptyRound.push({player1: null, player2: null, winner: null});
-        renderLaterRounds.push(emptyRound);
-    }
+    <!-- CONTENEDOR MODO ARENA -->
+    <div id="arena-workspace" class="flex w-full h-[85vh] gap-6 transition-all duration-300 ${isArena ? 'p-6 bg-gray-50' : ''}">
+        <div class="relative w-full bg-white rounded-3xl shadow-lg border border-gray-200 overflow-auto flex-grow" id="bracket-area">`;
 
-    // Juntamos todas las columnas
-    const allPhases = [];
-    allPhases.push({ phase: 'round1', matches: data.round1Matches, title: 'Dieciseisavos' });
-    if (data.repechageMatches && data.repechageMatches.length > 0) {
-        allPhases.push({ phase: 'repechage', matches: data.repechageMatches, title: 'Repechaje' });
-    }
-    
-    const roundTitles = ["Octavos", "Cuartos", "Semifinal", "Gran Final"];
-    renderLaterRounds.forEach((r, idx) => {
-        let titleIndex = roundTitles.length - (renderLaterRounds.length - idx);
-        let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${idx + 2}`;
-        allPhases.push({ phase: 'laterRounds', matches: r, roundIndex: idx, title: phaseTitle });
-    });
+    // --- DETECTAR SI ES PELEA O CARRERA ---
+    const isCarrera = cat === 'Seg. de línea' || cat === 'Evasor';
 
-    let html = `<div class="relative w-full bg-white rounded-3xl shadow-lg border border-gray-200 overflow-hidden">`;
-    html += `<div class="bracket-wrapper">`;
-
-    // Renderizamos las columnas de izquierda a derecha
-    allPhases.forEach((ph) => {
-        html += `<div class="bracket-col">
-                    <h4 class="absolute -top-6 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">${ph.title}</h4>`;
+    if (isCarrera) {
+        // 🏁 TABLA TIPO FÓRMULA 1 PARA PISTAS (Animada)
+        html += `<div class="w-full max-w-4xl mx-auto mt-8 flex flex-col gap-3 pb-20">
+                    <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-emerald-800 text-white font-black text-xs uppercase tracking-widest rounded-t-2xl shadow-md">
+                        <div class="col-span-1 text-center">POS</div>
+                        <div class="col-span-5">ROBOT / EQUIPO</div>
+                        <div class="col-span-2 text-center">TIEMPO BASE</div>
+                        <div class="col-span-2 text-center text-amber-300">PENALIZACIÓN</div>
+                        <div class="col-span-2 text-right">TIEMPO FINAL</div>
+                    </div>`;
         
-        ph.matches.forEach((m, idx) => {
-            let actualIdx = ph.phase === 'laterRounds' ? [ph.roundIndex, idx] : idx;
-            html += renderMatchBox(cat, ph.phase, actualIdx, m);
+        // Simulación de datos (Mientras conectas Firebase)
+        const dummyData = data.participants.map((p, i) => ({ 
+            name: p, base: (30 + i*2), penaltis: (i%2===0?1:0) 
+        }));
+        // Ordenar por tiempo final (Base + 5s por penalización)
+        dummyData.sort((a,b) => (a.base + a.penaltis*5) - (b.base + b.penaltis*5));
+
+        dummyData.forEach((robot, index) => {
+            let finalTime = robot.base + (robot.penaltis * 5);
+            let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+            let color = index === 0 ? 'bg-amber-100 border-amber-300' : 'bg-white border-gray-200';
+            let delay = index * 0.1; // Efecto cascada
+
+            html += `
+            <div class="grid grid-cols-12 gap-4 px-6 py-4 items-center ${color} border rounded-xl shadow-sm modal-content" style="animation-delay: ${delay}s">
+                <div class="col-span-1 text-center text-xl font-black text-gray-500">${medal}</div>
+                <div class="col-span-5 flex flex-col">
+                    <span class="font-extrabold text-gray-800 uppercase text-lg">${esc(robot.name)}</span>
+                    <span class="text-[10px] text-gray-400 font-bold uppercase">${esc(docentesMap[robot.name] || 'Sin Asesor')}</span>
+                </div>
+                <div class="col-span-2 text-center font-bold text-gray-500">${robot.base}s</div>
+                <div class="col-span-2 text-center font-black text-red-500">+${robot.penaltis * 5}s <span class="text-[10px] text-gray-400">(${robot.penaltis} obs)</span></div>
+                <div class="col-span-2 text-right font-black text-emerald-600 text-2xl">${finalTime}s</div>
+            </div>`;
         });
+        html += `</div>`;
+
+    } else if (subView === 'phase1') {
+        // --- RENDERIZADO NORMAL DE BRACKETS PARA COMBATES ---
+        html += `<div class="bracket-wrapper min-w-max justify-center">`;
+        
+        const r1Total = data.round1Matches.length;
+        const halfR1 = Math.ceil(r1Total / 2);
+        const leftR1 = data.round1Matches.slice(0, halfR1);
+        const rightR1 = data.round1Matches.slice(halfR1);
+
+        // LADO IZQUIERDO (Mitad 1 de Ronda 1)
+        html += `<div class="bracket-col">
+                    <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+        leftR1.forEach((m, idx) => { html += renderMatchBox(cat, 'round1', idx, m, subView); });
+        html += `</div>`;
+
+        // CENTRO (Repechaje Enmarcado)
+        if (data.repechageMatches && data.repechageMatches.length > 0) {
+            html += `<div class="bracket-col justify-start px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8 min-h-full">
+                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Repechaje</h4>`;
+            data.repechageMatches.forEach((m, idx) => { html += renderMatchBox(cat, 'repechage', idx, m, subView); });
+            html += `</div>`;
+        }
+
+        // LADO DERECHO (Mitad 2 de Ronda 1)
+        if (rightR1.length > 0) {
+            html += `<div class="bracket-col">
+                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+            rightR1.forEach((m, idx) => {
+                let actualIdx = halfR1 + idx;
+                html += renderMatchBox(cat, 'round1', actualIdx, m, subView);
+            });
+            html += `</div>`;
+        }
         
         html += `</div>`;
-    });
+    
+    } else if (subView === 'phase2') {
+        html += `<div class="bracket-wrapper min-w-max justify-center">`;
+        const roundTitles = ["Ronda 2", "Octavos", "Cuartos", "Semifinal"];
+        const totalRounds = data.laterRounds.length;
+        
+        // LADO IZQUIERDO (Mitad 1)
+        for (let rIdx = 0; rIdx < totalRounds - 1; rIdx++) {
+            let matches = data.laterRounds[rIdx];
+            let leftMatches = matches.slice(0, matches.length / 2);
+            let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
+            let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
+            
+            // Etiqueta .col-left para las líneas correctas
+            html += `<div class="bracket-col col-left">
+                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">${phaseTitle}</h4>`;
+            leftMatches.forEach((m, idx) => { html += renderMatchBox(cat, 'laterRounds', [rIdx, idx], m, subView); });
+            html += `</div>`;
+        }
 
-    // Columna Final: Campeón
-    if (data.champion) {
-        html += `<div class="bracket-col justify-center pl-4">
-                    <div class="match-container">
-                        <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 border-4 border-emerald-300 rounded-xl p-8 shadow-2xl text-center transform scale-110 w-[260px] animate-pulse">
-                            <h4 class="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-3">🏆 Campeón Absoluto</h4>
+        // CENTRO (Gran Final y Campeón)
+        html += `<div class="bracket-col justify-center px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/30 rounded-3xl pb-8">
+                    <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-amber-600 uppercase tracking-widest border-b-2 border-amber-200 pb-2">Gran Final</h4>`;
+        let finalMatch = data.laterRounds[totalRounds - 1][0];
+        html += renderMatchBox(cat, 'laterRounds', [totalRounds - 1, 0], finalMatch, subView);
+        
+        if (data.champion) {
+            html += `<div class="match-container mt-8">
+                        <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 border-4 border-emerald-300 rounded-xl p-8 shadow-2xl text-center transform scale-110 w-[260px] animate-pulse mx-auto">
+                            <h4 class="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-3">🏆 Campeón</h4>
                             <div class="text-2xl font-black text-white drop-shadow-md mb-2">${esc(data.champion)}</div>
                             <div class="text-[9px] font-bold text-emerald-200 pt-3 border-t border-emerald-400 uppercase tracking-wider">${esc(docentesMap[data.champion])}</div>
                         </div>
-                    </div>
-                 </div>`;
+                     </div>`;
+        }
+        html += `</div>`;
+
+        // LADO DERECHO (Mitad 2, orden invertido para el efecto Espejo)
+        for (let rIdx = totalRounds - 2; rIdx >= 0; rIdx--) {
+            let matches = data.laterRounds[rIdx];
+            let rightMatches = matches.slice(matches.length / 2);
+            let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
+            let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
+            
+            // Etiqueta .col-right para que las líneas apunten a la izquierda
+            html += `<div class="bracket-col col-right">
+                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">${phaseTitle}</h4>`;
+            rightMatches.forEach((m, idx) => { 
+                let actualIdx = (matches.length / 2) + idx;
+                html += renderMatchBox(cat, 'laterRounds', [rIdx, actualIdx], m, subView); 
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
     }
 
-    html += `</div>`; // Fin de bracket-wrapper
+    html += `</div>
+        <!-- LADO B: PUNTAJES -->
+        <div id="arena-scoreboard" class="${isArena ? 'flex' : 'hidden'} w-[400px] flex-shrink-0 bg-white rounded-3xl shadow-lg border border-gray-200 p-6 flex-col relative overflow-hidden">
+            <h2 class="text-2xl font-black text-center text-gray-800 mb-4 uppercase tracking-tighter pb-2 border-b-2 border-gray-100">🏆 Tabla General</h2>
+            <div class="flex-grow overflow-y-auto flex flex-col gap-3 pr-2">`;
+            
+    // 🧠 MAGIA: Puntos Exclusivos del Juez
+    let scores = {};
+    data.participants.forEach(p => {
+        // Lee los puntos reales de la base de datos (0 si el juez no ha calificado)
+        scores[p] = (data.puntosTotales && data.puntosTotales[p]) ? data.puntosTotales[p] : 0;
+    });
+    
+    // Ordenar de mayor a menor puntaje
+    let ranking = Object.keys(scores).map(name => ({ name, score: scores[name] })).sort((a,b) => b.score - a.score);
 
-    // CAJA DE REPECHAJE (IMPAR) ESQUINA INFERIOR IZQUIERDA
-    if (data.byePlayer && data.phase === 'round1') {
-        html += `<div class="absolute bottom-6 left-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-xl p-4 shadow-lg min-w-[220px] z-30">
-                    <div class="flex items-center gap-2 mb-2 border-b border-amber-200 pb-1">
-                        <span class="text-amber-500 text-lg">🎟️</span>
-                        <span class="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pase Directo / Impar</span>
-                    </div>
-                    <div class="font-black text-sm text-amber-900 truncate">${esc(data.byePlayer)}</div>
-                    <div class="text-[8px] font-bold text-amber-700 mt-1 uppercase truncate opacity-80">${esc(docentesMap[data.byePlayer])}</div>
-                 </div>`;
-    }
+    // Dibujar Tarjetas de Posición
+    ranking.forEach((robot, index) => {
+        let medal = index + 1;
+        if (index === 0 && robot.score > 0) medal = '🥇';
+        if (index === 1 && robot.score > 0) medal = '🥈';
+        if (index === 2 && robot.score > 0) medal = '🥉';
+        
+        let rankColor = index < 3 ? 'text-amber-500' : 'text-gray-300';
+        
+        html += `
+        <div class="w-full bg-white border border-gray-100 rounded-xl p-3 flex justify-between items-center shadow-sm hover:shadow-md transition-all transform hover:-translate-y-1">
+            <div class="flex items-center gap-3">
+                <span class="text-lg font-black w-6 text-center ${rankColor}">${medal}</span>
+                <div class="flex flex-col">
+                    <span class="font-bold text-sm text-gray-800 uppercase tracking-tight">${esc(robot.name)}</span>
+                    <span class="text-[9px] text-gray-400 font-bold uppercase">${esc(docentesMap[robot.name] || 'Sin Asesor')}</span>
+                </div>
+            </div>
+            <div class="font-black text-emerald-600 text-xl">${robot.score} <span class="text-[10px] text-gray-400">pts</span></div>
+        </div>`;
+    });
 
-    // BOTÓN DE REINICIAR (Arriba a la derecha)
-    html += `<div class="absolute top-6 right-6 z-30">
-                <button class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 px-4 rounded-lg shadow-sm transition-all active:scale-95 uppercase tracking-wider text-[9px]" onclick="resetTournament('${cat}')">
-                    🔄 Reiniciar Llaves
-                </button>
-             </div>`;
-
-    html += `</div>`;
+    html += `</div>
+            <button onclick="salirModoArena()" class="mt-6 bg-red-500 hover:bg-red-600 text-white w-full py-4 rounded-xl font-extrabold text-sm uppercase tracking-widest shadow-md flex items-center justify-center gap-2 active:scale-95 z-10">
+                ❌ Salir de Pantalla Completa
+            </button>
+        </div>
+    </div>`; 
     container.innerHTML = html;
 }
 
-function renderMatchBox(cat, phase, matchIdx, match) {
-    const renderRow = (player) => {
-        // Cajas vacías (Esperando a que ganen las rondas previas)
+function renderMatchBox(cat, phase, matchIdx, match, subView) {
+    const renderRow = (player, isOpponentNull, isThisRowTheNullOne) => {
+        
+        
         if (!player) return `
             <div class="player-row text-gray-400 bg-gray-50/50 cursor-not-allowed">
                 <div class="player-info">
@@ -297,34 +712,112 @@ function renderMatchBox(cat, phase, matchIdx, match) {
             </div>`;
         
         const isWinner = match.winner === player;
-        const winnerClass = isWinner ? 'winner' : '';
-        const checkIcon = isWinner ? '✓' : '';
+        const isLoser = match.winner !== null && match.winner !== player;
+        const isImpar = (phase === 'repechage' && player === tournamentData[cat].byePlayer);
+        
+        let rowClass = '';
+        let nameColorClass = '';
+        let docColorClass = '';
+        let tagHtml = '';
+        
+        if (isWinner) {
+            if (phase === 'repechage') {
+                // Asigna la nueva clase CSS blindada
+                rowClass = 'winner-rep';
+            } else {
+                rowClass = 'winner';
+            }
+        } else if (isLoser) {
+            rowClass = 'opacity-40 grayscale bg-red-50/30';
+        } else if (isImpar) {
+            // Diseño Naranja Claro para el Impar en Repechaje
+            rowClass = 'bg-orange-50 border-l-4 border-l-orange-400';
+            nameColorClass = 'text-orange-700';
+            docColorClass = 'text-orange-500';
+            tagHtml = `<span class="text-[9px] font-black text-orange-400 ml-1">(IMPAR)</span>`;
+        }
+        
+        const strikethrough = isLoser ? 'line-through decoration-red-500 decoration-2 text-gray-400' : '';
+        const icon = isWinner ? '✓' : (isLoser ? '<span class="text-red-600 font-black text-sm drop-shadow-md">❌</span>' : '');
         
         return `
-            <div class="player-row ${winnerClass}" onclick="selectWinner('${cat}','${phase}',${JSON.stringify(matchIdx)},'${escAttr(player)}')">
+            <div class="player-row ${rowClass} relative" onclick="selectWinner('${cat}','${phase}',${JSON.stringify(matchIdx)},'${escAttr(player)}', '${subView}')">
                 <div class="player-info">
-                    <span class="player-name">${esc(player)}</span>
-                    <span class="docente-text">${esc(docentesMap[player] || 'Sin Asesor')}</span>
+                    <span class="player-name ${strikethrough} ${nameColorClass}">${esc(player)} ${tagHtml}</span>
+                    <span class="docente-text ${docColorClass}">${esc(docentesMap[player] || 'Sin Asesor')}</span>
                 </div>
-                <span class="score-box">${checkIcon}</span>
+                <span class="score-box bg-transparent border border-gray-200/50 flex items-center justify-center w-6 h-6">${icon}</span>
             </div>
         `;
     };
 
     return `
         <div class="match-container">
-            <div class="match-card">
-                ${renderRow(match.player1)}
-                ${renderRow(match.player2)}
+            <div class="match-card hover:shadow-lg transition-shadow overflow-hidden flex flex-col">
+                ${renderRow(match.player1, match.player2 === null, match.player1 === null)}
+                ${renderRow(match.player2, match.player1 === null, match.player2 === null)}
+                
+                <!-- BOTÓN PARA MANDAR AL PANEL -->
+                <div onclick="prepararPanel('${cat}', '${match.player1}', '${match.player2}')" class="w-full bg-gray-50 hover:bg-emerald-100 text-center cursor-pointer border-t border-gray-100 transition-colors">
+                    <span class="text-[10px] font-bold text-gray-400 hover:text-emerald-700 uppercase tracking-widest block py-2 flex items-center justify-center gap-1">
+                        ⚡ Cargar en Panel
+                    </span>
+                </div>
             </div>
         </div>
     `;
 }
 
-window.resetTournament = function(cat) {
-    if (confirm("⚠️ ¿Deseas reiniciar las llaves de esta categoría? Se borrarán las selecciones de ganadores actuales.")) {
-        tournamentData[cat].round1Matches = []; tournamentData[cat].laterRounds = []; tournamentData[cat].repechageMatches = []; tournamentData[cat].champion = null;
-        generateInitialMatches(cat); renderTournament(cat);
+// =====================================================================
+// 🔥 NÚCLEO DE SINCRONIZACIÓN UNIVERSAL (TODOS VEN LO MISMO)
+// =====================================================================
+async function guardarBracketFirebase(cat) {
+    const data = tournamentData[cat];
+    if(!data.round1Matches || data.round1Matches.length === 0) return;
+    
+    // Limpiamos los "undefined" para que Firebase no llore
+    const payload = JSON.parse(JSON.stringify({
+        round1Matches: data.round1Matches,
+        repechageMatches: data.repechageMatches,
+        laterRounds: data.laterRounds,
+        champion: data.champion,
+        byePlayer: data.byePlayer,
+        phase: data.phase
+    }));
+    
+    await setDoc(doc(db, "brackets_estado", cat), payload);
+}
+
+// BOTÓN NUCLEAR: Borra llaves y regresa puntos de TODOS a 0
+window.resetTournament = async function(cat) {
+    if (confirm(`⚠️ ¡PELIGRO! ¿Deseas reiniciar TODO el torneo de ${cat}?\n\n- Se borrarán las llaves.\n- Se regresarán a 0 TODOS los puntos de los robots en la base de datos.\n\nEsta acción no se puede deshacer.`)) {
+        
+        // 1. Matar el estado del bracket en Firebase
+        try { await deleteDoc(doc(db, "brackets_estado", cat)); } catch(e){}
+
+        // 2. Regresar todos los puntajes a 0 en la BD Real
+        const q = query(collection(db, "competidores"));
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        
+        snap.forEach(docSnap => {
+            const robot = docSnap.data();
+            let tagBuscado = (robot.categoria_tag || '').toLowerCase();
+            let oriBuscado = (robot.categoria_original || '').toLowerCase();
+            // Si el robot es de esta categoría, le volamos los puntos
+            if(tagBuscado === cat || oriBuscado.includes(cat.substring(0,3))) {
+                batch.update(docSnap.ref, { score: 0, puntos: 0, puntaje: 0, puntosTotales: 0 });
+            }
+        });
+        await batch.commit();
+
+        // 3. Limpiar memoria local y regenerar el sorteo
+        localStorage.removeItem('fime_bracket_' + cat); 
+        tournamentData[cat].round1Matches = [];
+        generateInitialMatches(cat);
+        renderTournament(cat, 'menu');
+        
+        alert(`✅ Torneo de ${cat} reiniciado desde cero y puntos en 0.`);
     }
 };
 
@@ -424,3 +917,137 @@ window.exportAllToExcel = () => {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+
+window.activarModoArena = function() {
+    // Magia: Pedimos pantalla completa a TODA la página, no solo al cuadro.
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+    }
+};
+
+window.salirModoArena = function() {
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+};
+
+
+// 🚨 VIGILANTE DE EVENTOS: Detecta si entramos o salimos
+document.addEventListener('fullscreenchange', () => {
+    const isArena = !!document.fullscreenElement;
+    const mainHeader = document.querySelector('header');
+    const workspace = document.getElementById('arena-workspace');
+    const header = document.getElementById('arena-header');
+    const scoreboard = document.getElementById('arena-scoreboard');
+    
+    if (isArena) {
+        // Entrando al Modo Arena
+        if (mainHeader) mainHeader.style.display = 'none';
+        if (header) header.style.display = 'none';
+        if (scoreboard) { scoreboard.classList.remove('hidden'); scoreboard.classList.add('flex'); }
+        if (workspace) {
+            // MAGIA: Rompe los límites de la web y fuerza el 100% del monitor real
+            workspace.classList.add('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
+            workspace.classList.remove('h-[85vh]');
+        }
+    } else {
+        // Saliendo del Modo Arena
+        if (mainHeader) mainHeader.style.display = '';
+        if (header) header.style.display = ''; 
+        if (scoreboard) { scoreboard.classList.add('hidden'); scoreboard.classList.remove('flex'); }
+        if (workspace) {
+            // Regresa a la normalidad
+            workspace.classList.remove('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
+            workspace.classList.add('h-[85vh]');
+        }
+    }
+});
+
+// --- ESTILO PARA EL MODAL (Animación suave) ---
+if (!document.getElementById('modal-styles')) {
+    const style = document.createElement('style');
+    style.id = 'modal-styles';
+    style.innerHTML = `
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 99999; }
+        .modal-content { animation: modalFadeIn 0.3s ease-out forwards; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    `;
+    document.head.appendChild(style);
+}
+
+// --- FUNCIÓN PARA DIBUJAR Y ABRIR EL MODAL ---
+window.abrirModalPuntajes = function(cat) {
+    const data = tournamentData[cat];
+    if (!data) return;
+
+    // 1. Puntos Exclusivos del Juez (Misma lógica que la Arena)
+    let scores = {};
+    data.participants.forEach(p => {
+        scores[p] = (data.puntosTotales && data.puntosTotales[p]) ? data.puntosTotales[p] : 0;
+    });
+
+    let ranking = Object.keys(scores).map(name => ({ name, score: scores[name] })).sort((a,b) => b.score - a.score);
+
+    // 2. Creamos la estructura visual de la ventanita emergente (Modal)
+    let modalHtml = `
+    <div id="puntajes-modal" class="fixed inset-0 modal-overlay flex justify-center items-center p-4">
+        <div class="modal-content bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 relative">
+            
+            <!-- Cabecera del Modal -->
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+                <div>
+                    <h2 class="text-xl font-black text-emerald-800 uppercase tracking-tighter">🏆 Scoreboard Oficial</h2>
+                    <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Categoría ${cat}</p>
+                </div>
+                <button onclick="document.getElementById('puntajes-modal').remove()" class="text-gray-400 hover:text-red-500 bg-white hover:bg-red-50 border border-gray-200 p-2 rounded-full transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <!-- Lista de Equipos (Con Scroll si son muchos) -->
+            <div class="flex-grow overflow-y-auto p-5 flex flex-col gap-3 bg-gray-50/30">`;
+
+    ranking.forEach((robot, index) => {
+        let medal = index + 1;
+        if (index === 0 && robot.score > 0) medal = '🥇';
+        if (index === 1 && robot.score > 0) medal = '🥈';
+        if (index === 2 && robot.score > 0) medal = '🥉';
+        let rankColor = index < 3 ? 'text-amber-500' : 'text-gray-400';
+        let bgStyle = index === 0 && robot.score > 0 ? 'bg-amber-50 border-amber-200 shadow-md' : 'bg-white border-gray-100 shadow-sm';
+        
+        modalHtml += `
+        <div class="w-full ${bgStyle} border rounded-xl p-3 flex justify-between items-center transition-all hover:shadow-md">
+            <div class="flex items-center gap-4">
+                <span class="text-xl font-black w-8 text-center ${rankColor} drop-shadow-sm">${medal}</span>
+                <div class="flex flex-col">
+                    <span class="font-extrabold text-sm text-gray-800 uppercase tracking-tight">${esc(robot.name)}</span>
+                    <span class="text-[9px] text-gray-400 font-bold uppercase">${esc(docentesMap[robot.name] || 'Sin Asesor')}</span>
+                </div>
+            </div>
+            <div class="font-black text-emerald-600 text-xl tracking-tighter">${robot.score} <span class="text-[10px] text-gray-400 font-bold">PTS</span></div>
+        </div>`;
+    });
+
+    modalHtml += `
+            </div>
+        </div>
+    </div>`;
+
+    // 3. Inyectamos el Modal directamente en el Body de la página
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+// =====================================================================
+// TRANSMISOR DE RADIO PARA EL PANEL MAESTRO
+// =====================================================================
+const canalPanel = new BroadcastChannel('fime_torneo_canal');
+
+window.prepararPanel = function(cat, r1, r2) {
+    if(!r1 || !r2 || r1==='null' || r2==='null' || r1==='EMPTY' || r2==='EMPTY') {
+        alert("⚠️ Necesitas que ambos robots estén definidos en esta llave.");
+        return;
+    }
+    
+    canalPanel.postMessage({ accion: 'cargar_pelea', cat: cat, r1: r1, r2: r2 });
+    console.log(`📡 Señal enviada al panel: ${r1} VS ${r2}`);
+};
