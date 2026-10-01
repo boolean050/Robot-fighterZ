@@ -789,18 +789,20 @@ async function guardarBracketFirebase(cat) {
 }
 
 // BOTÓN NUCLEAR: Borra llaves y regresa puntos de TODOS a 0
+// BOTÓN NUCLEAR: Borra llaves, regresa puntos a 0 y purga historial de veredictos
 window.resetTournament = async function(cat) {
-    if (confirm(`⚠️ ¡PELIGRO! ¿Deseas reiniciar TODO el torneo de ${cat}?\n\n- Se borrarán las llaves.\n- Se regresarán a 0 TODOS los puntos de los robots en la base de datos.\n\nEsta acción no se puede deshacer.`)) {
+    if (confirm(`⚠️ ¡PELIGRO! ¿Deseas reiniciar TODO el torneo de ${cat}?\n\nSe borrarán las llaves.\nSe regresarán a 0 TODOS los puntos de los robots en la base de datos y se borrará el historial de veredictos.\n\nEsta acción no se puede deshacer.`)) {
         
         // 1. Matar el estado del bracket en Firebase
         try { await deleteDoc(doc(db, "brackets_estado", cat)); } catch(e){}
 
-        // 2. Regresar todos los puntajes a 0 en la BD Real
-        const q = query(collection(db, "competidores"));
-        const snap = await getDocs(q);
         const batch = writeBatch(db);
+
+        // 2. Regresar todos los puntajes a 0 en la BD Real (Competidores)
+        const qCompetidores = query(collection(db, "competidores"));
+        const snapCompetidores = await getDocs(qCompetidores);
         
-        snap.forEach(docSnap => {
+        snapCompetidores.forEach(docSnap => {
             const robot = docSnap.data();
             let tagBuscado = (robot.categoria_tag || '').toLowerCase();
             let oriBuscado = (robot.categoria_original || '').toLowerCase();
@@ -809,15 +811,25 @@ window.resetTournament = async function(cat) {
                 batch.update(docSnap.ref, { score: 0, puntos: 0, puntaje: 0, puntosTotales: 0 });
             }
         });
+
+        // 🔥 3. NUEVO: Purgar el historial de Veredictos de esta categoría específica
+        const qVeredictos = query(collection(db, "veredictos"), where("categoria", "==", cat));
+        const snapVeredictos = await getDocs(qVeredictos);
+        
+        snapVeredictos.forEach(docV => {
+            batch.delete(docV.ref);
+        });
+
+        // Ejecutamos todo el paquete de borrado/actualización al mismo tiempo
         await batch.commit();
 
-        // 3. Limpiar memoria local y regenerar el sorteo
+        // 4. Limpiar memoria local y regenerar el sorteo
         localStorage.removeItem('fime_bracket_' + cat); 
         tournamentData[cat].round1Matches = [];
         generateInitialMatches(cat);
         renderTournament(cat, 'menu');
         
-        alert(`✅ Torneo de ${cat} reiniciado desde cero y puntos en 0.`);
+        alert(`✅ Torneo de ${cat} reiniciado.\nPuntos devueltos a 0 e historial de veredictos limpiado.`);
     }
 };
 
