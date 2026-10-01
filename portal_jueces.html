@@ -158,43 +158,53 @@
 <!-- 🥊 MODO COMBATE (El que ya tenías)         -->
 <!-- ========================================== -->
 <div id="juez-modo-combate" class="hidden text-left space-y-5 animate-fade-in">
+    
+    <!--Reloj-->
     <div class="bg-red-50 border-2 border-red-200 rounded-xl p-3 flex justify-between items-center shadow-inner">
         <span class="text-xs font-black text-red-800 uppercase tracking-widest flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span> EN VIVO
         </span>
         <span id="cronometro-juez" class="text-3xl font-mono font-black text-red-600 tracking-wider">05:00</span>
     </div>
+
+    <!--Barra VS-->
     <div class="flex items-center justify-between gap-2">
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex-1 text-center truncate"><span id="juez-robot1" class="font-bold text-blue-900 text-xs">R1</span></div>
         <div class="bg-gray-800 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase z-10">VS</div>
         <div class="bg-orange-50 border border-orange-200 rounded-lg p-2 flex-1 text-center truncate"><span id="juez-robot2" class="font-bold text-orange-900 text-xs">R2</span></div>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-black text-gray-700 uppercase tracking-widest border-b pb-2 mb-4 text-center">Registrar Acciones</p>
-        <div class="mb-5 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-            <p class="text-xs font-bold text-blue-800 mb-2" id="eval-robot1-name">R1</p>
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-semibold text-gray-600">Golpes</span>
-                <div class="flex items-center gap-2">
-                    <button onclick="modificarPuntos('r1-golpes', -1)" class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
-                    <span id="r1-golpes" class="font-mono font-bold w-4 text-center text-xs">0</span>
-                    <button onclick="modificarPuntos('r1-golpes', 1)" class="w-6 h-6 rounded bg-blue-600 text-white">+</button>
-                </div>
+
+    <!-- NUEVO PANEL DE DECISIÓN CARA A CARA (ALTO CONTRASTE) -->
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mt-2">
+        <!-- Texto de estado central (Sustituye al botón verde) -->
+        <h3 id="status-dictamen" class="text-[12px] font-black text-gray-400 text-center uppercase tracking-widest mb-4">
+            ⏳ ESPERANDO FIN DE PELEA...
+        </h3>
+        
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Lado Izquierdo: Robot 1 -->
+            <div class="flex flex-col items-center gap-3 border-r border-gray-200 pr-2">
+                <span class="text-sm font-black text-blue-900 uppercase mb-1 text-center h-8 flex items-center justify-center" id="btn-lbl-r1">R1</span>
+                <button id="btn-dec-r1-golpes" onclick="window.enviarVeredictoFinal('r1', 'golpes')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
+                    🏆 GOLPES (+3)
+                </button>
+                <button id="btn-dec-r1-ko" onclick="window.enviarVeredictoFinal('r1', 'ko')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
+                    ☠️ K.O. (+5)
+                </button>
             </div>
-        </div>
-        <div class="p-3 bg-orange-50/50 rounded-lg border border-orange-100">
-            <p class="text-xs font-bold text-orange-800 mb-2" id="eval-robot2-name">R2</p>
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-semibold text-gray-600">Golpes</span>
-                <div class="flex items-center gap-2">
-                    <button onclick="modificarPuntos('r2-golpes', -1)" class="w-6 h-6 rounded bg-white border border-gray-300">-</button>
-                    <span id="r2-golpes" class="font-mono font-bold w-4 text-center text-xs">0</span>
-                    <button onclick="modificarPuntos('r2-golpes', 1)" class="w-6 h-6 rounded bg-orange-600 text-white">+</button>
-                </div>
+            
+            <!-- Lado Derecho: Robot 2 -->
+            <div class="flex flex-col items-center gap-3 pl-2">
+                <span class="text-sm font-black text-orange-900 uppercase mb-1 text-center h-8 flex items-center justify-center" id="btn-lbl-r2">R2</span>
+                <button id="btn-dec-r2-golpes" onclick="window.enviarVeredictoFinal('r2', 'golpes')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
+                    🏆 GOLPES (+3)
+                </button>
+                <button id="btn-dec-r2-ko" onclick="window.enviarVeredictoFinal('r2', 'ko')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
+                    ☠️ K.O. (+5)
+                </button>
             </div>
         </div>
     </div>
-    <button id="btnEnviarVeredicto" disabled class="w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest">⏳ Esperando...</button>
 </div>
 
 <!-- ========================================== -->
@@ -400,6 +410,35 @@
 
     </div>
 
+
+
+    <!-- MODAL REGISTRO EXITOSO (NUEVO POP-UP PREMIUM) -->
+    <div id="modalRegistroExitoso" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all opacity-0 scale-95 data-[show=true]:opacity-100 data-[show=true]:scale-100" style="transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+        <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm border-t-8 border-emerald-500 text-center">
+            
+            <!-- Icono animado -->
+            <div class="w-20 h-20 mx-auto bg-emerald-100 rounded-full flex items-center justify-center mb-5 shadow-inner">
+                <span class="text-4xl drop-shadow-sm">🎉</span>
+            </div>
+            
+            <h3 class="text-2xl font-black text-emerald-800 mb-2 uppercase tracking-tight">¡Bienvenido!</h3>
+            <p class="text-gray-500 text-xs font-bold mb-6">Tu cuenta de juez ha sido creada con éxito.</p>
+            
+            <!-- Tarjeta de credenciales -->
+            <div class="bg-gray-50 rounded-2xl p-5 mb-6 border border-gray-100 text-left shadow-sm">
+                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Docente Registrado:</p>
+                <p class="text-base font-black text-gray-800 mb-4 truncate" id="success-nombre">Ing. Angel</p>
+                
+                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Arena Asignada:</p>
+                <div class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-black px-3 py-1 rounded-lg uppercase tracking-wider" id="success-categoria">Mediano</div>
+            </div>
+
+            <!-- Botón de acción -->
+            <button onclick="cerrarModalRegistroYLogear()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl text-[13px] uppercase tracking-widest shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex justify-center items-center gap-2">
+                Iniciar Sesión Ahora <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+        </div>
+    </div>
 
 
     <!-- MODAL EDITAR DOCENTE (SÚPER ADMIN) -->

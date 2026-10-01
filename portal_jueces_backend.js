@@ -164,32 +164,56 @@ document.getElementById('registroForm').addEventListener('submit', async (e) => 
         return;
     }
 
+    // Bloquear botón para evitar doble clic
+    const btnSubmit = document.querySelector('#registroForm button[type="submit"]');
+    const originalText = btnSubmit.innerHTML;
+    btnSubmit.innerHTML = "⏳ Registrando...";
+    btnSubmit.disabled = true;
+
     try {
         await setDoc(doc(db, "maestros_autorizados", nombre), {
             nombre: nombre, categoria: categoria, password: pass1,
-            sesion_activa: true, fecha_registro: Date.now()
+            sesion_activa: false, 
+            fecha_registro: Date.now()
         });
 
-        // Borrar el "?modo=registro" de la URL para evitar bucles
         window.history.replaceState({}, document.title, window.location.pathname);
         
-        // Configurar los botones de la nueva pantalla intermedia
-        document.getElementById('btnEntrarSala').onclick = () => activarSesionDocente(nombre, categoria);
-        document.getElementById('btnIrLogin').onclick = () => {
-            sessionStorage.clear();
-            mostrarPantalla('loginForm');
-            document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
-        };
-
-        // Mostrar la pantalla de éxito bonita
-        mostrarPantalla('pantallaRegistroExitoso');
-        document.getElementById('subtituloPrincipal').textContent = "Validación Completada";
+        // 🚀 ADIÓS ALERT FEO, HOLA MODAL PREMIUM
+        document.getElementById('success-nombre').textContent = nombre;
+        document.getElementById('success-categoria').textContent = categoria;
+        
+        const modal = document.getElementById('modalRegistroExitoso');
+        modal.classList.remove('hidden');
+        // Pequeño delay para que la animación de entrada fluya bien
+        setTimeout(() => modal.setAttribute('data-show', 'true'), 50);
 
     } catch (error) {
-        msg.textContent = "Error creando cuenta.";
+        console.error("🔥 Error real de Firebase al registrar:", error);
+        msg.textContent = "❌ Error de conexión. Intenta de nuevo.";
         msg.classList.remove('hidden');
+    } finally {
+        btnSubmit.innerHTML = originalText;
+        btnSubmit.disabled = false;
     }
 });
+
+// Función global que ejecuta el botón verde del Pop-Up
+window.cerrarModalRegistroYLogear = function() {
+    const modal = document.getElementById('modalRegistroExitoso');
+    modal.removeAttribute('data-show');
+    
+    // Esperamos a que acabe la animación para esconderlo
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        sessionStorage.clear();
+        document.getElementById('registroForm').reset();
+        
+        mostrarPantalla('loginForm');
+        document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
+        document.getElementById('errorMsgRegistro').classList.add('hidden');
+    }, 300);
+};
 
 function activarSesionDocente(nombre, categoria) {
     currentUser = nombre;
@@ -610,48 +634,59 @@ function activarModoCombate(data) {
     }
     
     document.getElementById('juez-robot1').textContent = data.robot1;
-    document.getElementById('eval-robot1-name').textContent = data.robot1;
     document.getElementById('juez-robot2').textContent = data.robot2;
-    document.getElementById('eval-robot2-name').textContent = data.robot2;
+    
+    // 🔥 NOMBRES EN LOS BOTONES GIGANTES
+    const lblR1 = document.getElementById('btn-lbl-r1');
+    const lblR2 = document.getElementById('btn-lbl-r2');
+    if(lblR1) lblR1.textContent = data.robot1;
+    if(lblR2) lblR2.textContent = data.robot2;
 
-    // 🔥 EL PARCHE ANTI-TRABAS: Forzamos el reinicio absoluto al entrar a una nueva pelea
     combateTerminado = false;
     if(timerInterval) clearInterval(timerInterval);
     
     iniciarCronometro(data.tiempo_inicio);
 }
 
-// Variables globales para el reloj local (Pégalas justo arriba de la función iniciarCronometro)
-let idPeleaActual = null;
-let tiempoInicioLocal = 0;
+
+// 🔥 MEMORIA A LARGO PLAZO PARA EL RELOJ
+let idPeleaActual = sessionStorage.getItem('pelea_id_actual') || null;
+let tiempoInicioLocal = parseFloat(sessionStorage.getItem('pelea_inicio_local')) || 0;
 
 function iniciarCronometro(tiempoInicioServidor) {
-    // 1. REINICIAMOS LAS VARIABLES DE CONTROL
     combateTerminado = false; 
     
-    // 2. BLOQUEAMOS EL BOTÓN
-    const btn = document.getElementById('btnEnviarVeredicto');
-    if (btn) {
-        btn.disabled = true;
-        btn.className = "w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest shadow-sm cursor-not-allowed transition-all";
-        btn.innerHTML = "⏳ ESPERANDO FIN DE PELEA...";
+    // 1. FORZAMOS LOS BOTONES A GRIS / APAGADO
+    ['r1', 'r2'].forEach(r => {
+        const bg = document.getElementById(`btn-dec-${r}-golpes`);
+        const bk = document.getElementById(`btn-dec-${r}-ko`);
+        const claseGris = "w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm select-none";
+        if(bg) bg.className = claseGris;
+        if(bk) bk.className = claseGris;
+    });
+    
+    const statusText = document.getElementById('status-dictamen');
+    if (statusText) {
+        statusText.className = "text-[12px] font-black text-gray-400 text-center uppercase tracking-widest mb-4";
+        statusText.innerHTML = "⏳ ESPERANDO FIN DE PELEA...";
     }
 
-    // 🔥 MAGIA ANTI-SALTOS DE RELOJ: 
-    // Usamos el "tiempoInicioServidor" solo como un ID para saber si es una pelea nueva.
-    // Si lo es, tomamos la hora LOCAL de este dispositivo como el segundo cero exacto.
-    if (idPeleaActual !== tiempoInicioServidor) {
-        idPeleaActual = tiempoInicioServidor;
+    // 2. MAGIA ANTI-AMNESIA (Sobrevive al F5)
+    if (idPeleaActual !== tiempoInicioServidor.toString()) {
+        idPeleaActual = tiempoInicioServidor.toString();
         tiempoInicioLocal = Date.now() / 1000;
+        sessionStorage.setItem('pelea_id_actual', idPeleaActual);
+        sessionStorage.setItem('pelea_inicio_local', tiempoInicioLocal);
     }
 
-    let duracionTotal = 300; // 🔥 5 MINUTOS EXACTOS (300 segundos)
+    let duracionTotal = 300; 
 
-    // 3. ARRANCAMOS EL RELOJ
+    if(timerInterval) clearInterval(timerInterval);
+
     timerInterval = setInterval(() => {
         let ahora = Date.now() / 1000; 
         let transcurrido = ahora - tiempoInicioLocal;
-        let restante = duracionTotal - transcurrido;
+        let restante = Math.ceil(duracionTotal - transcurrido);
 
         if (restante <= 0) {
             clearInterval(timerInterval);
@@ -668,100 +703,91 @@ function iniciarCronometro(tiempoInicioServidor) {
 
 function finalizarCombateNatural() {
     combateTerminado = true;
-    habilitarEnvioVeredicto("TIEMPO AGOTADO - ENVIAR VEREDICTO");
+    habilitarEnvioVeredicto("TIEMPO AGOTADO");
 }
 
 function finalizarCombatePorKO() {
     combateTerminado = true;
     if(timerInterval) clearInterval(timerInterval);
     document.getElementById('cronometro-juez').textContent = "K.O.";
-    habilitarEnvioVeredicto("K.O. DECLARADO - ENVIAR VEREDICTO");
+    habilitarEnvioVeredicto("K.O. DECLARADO");
 }
 
 function habilitarEnvioVeredicto(texto) {
-    const btn = document.getElementById('btnEnviarVeredicto');
-    if(btn) {
-        btn.disabled = false;
-        btn.className = "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg transform active:scale-95 transition-all animate-pulse";
-        btn.innerHTML = `✅ ${texto}`;
+    // Encendemos los botones con ALTO CONTRASTE para los Ingenieros
+    ['r1', 'r2'].forEach(r => {
+        const btnGolpes = document.getElementById(`btn-dec-${r}-golpes`);
+        const btnKo = document.getElementById(`btn-dec-${r}-ko`);
+        
+        if(btnGolpes) {
+            btnGolpes.className = "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl text-[14px] uppercase tracking-widest shadow-xl border-b-4 border-emerald-800 transition-all text-center cursor-pointer active:scale-95 active:translate-y-1 animate-pulse select-none";
+        }
+        if(btnKo) {
+            btnKo.className = "w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl text-[14px] uppercase tracking-widest shadow-xl border-b-4 border-red-800 transition-all text-center cursor-pointer active:scale-95 active:translate-y-1 animate-pulse select-none";
+        }
+    });
+    
+    const statusText = document.getElementById('status-dictamen');
+    if(statusText) {
+        statusText.className = "text-[12px] font-black text-emerald-600 text-center uppercase tracking-widest mb-4";
+        statusText.innerHTML = `✅ ${texto} - SELECCIONA AL GANADOR`;
     }
 }
 
-window.modificarPuntos = function(id, cantidad) {
-    if (combateTerminado) return; 
-    let mapClaves = {
-        'r1-golpes': 'r1Golpes', 'r1-saques': 'r1Saques',
-        'r2-golpes': 'r2Golpes', 'r2-saques': 'r2Saques'
-    };
-    let clave = mapClaves[id];
-    puntos[clave] += cantidad;
-    if (puntos[clave] < 0) puntos[clave] = 0; 
-    document.getElementById(id).textContent = puntos[clave];
-};
-
-document.getElementById('btnEnviarVeredicto')?.addEventListener('click', async () => {
-    if(!confirm("¿Estás seguro de enviar tu evaluación oficial?")) return;
+window.enviarVeredictoFinal = async function(ladoGanador, metodo) {
+    if (!combateTerminado) return; 
     
-    const r1Name = document.getElementById('juez-robot1').textContent;
-    const r2Name = document.getElementById('juez-robot2').textContent;
+    // Leemos los nombres directamente de los nuevos labels del HTML
+    const r1Name = document.getElementById('btn-lbl-r1').innerText;
+    const r2Name = document.getElementById('btn-lbl-r2').innerText;
+    
+    const ganadorNombre = ladoGanador === 'r1' ? r1Name : r2Name;
+    const puntosGanados = metodo === 'ko' ? 5 : 3;
+    
+    if(!confirm(`¿Declarar a ${ganadorNombre} como ganador oficial por ${metodo.toUpperCase()} (+${puntosGanados} pts)?`)) return;
+
+    // Mantener estructura original de puntos para no romper otras funciones
+    let puntosEstructura = { r1Golpes: 0, r1Saques: 0, r2Golpes: 0, r2Saques: 0 };
+    if (ladoGanador === 'r1') {
+        puntosEstructura.r1Golpes = puntosGanados; 
+    } else {
+        puntosEstructura.r2Golpes = puntosGanados; 
+    }
 
     const payload = {
         juez: currentUser,
         categoria: catMap[currentCategory],
         robot1: r1Name,
         robot2: r2Name,
-        puntos: puntos,
-        timestamp: Date.now()
+        puntos: puntosEstructura, 
+        timestamp: Date.now(),
+        ganador_declarado: ganadorNombre,
+        metodo_victoria: metodo
     };
 
     try {
-        // 1. Guardamos el historial del veredicto (Lo que ya hacías)
+        // 1. Guardamos el recibo
         await addDoc(collection(db, "veredictos"), payload);
 
-        // 🔥 2. EL PUENTE A LA TABLA: Sumamos los puntos al perfil del robot en 'competidores'
-        // NOTA: Aquí estoy sumando Golpes + Saques = 1 punto cada uno. 
-        // Si los saques valen más, cámbialo aquí, ej: puntos.r1Golpes + (puntos.r1Saques * 3)
-        const totalR1 = puntos.r1Golpes + puntos.r1Saques; 
-        const totalR2 = puntos.r2Golpes + puntos.r2Saques;
-
-        // Buscamos a Robot 1 en el padrón y le sumamos sus puntos
-        const snap1 = await getDocs(query(collection(db, "competidores"), where("nombre", "==", r1Name)));
-        snap1.forEach(d => {
+        // 2. Sumamos los puntos al ganador
+        const snapGanador = await getDocs(query(collection(db, "competidores"), where("nombre", "==", ganadorNombre)));
+        snapGanador.forEach(d => {
             let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
-            updateDoc(d.ref, { score: actual + totalR1 }); // Actualiza la BD real
+            updateDoc(d.ref, { score: actual + puntosGanados }); 
         });
 
-        // Buscamos a Robot 2 en el padrón y le sumamos sus puntos
-        const snap2 = await getDocs(query(collection(db, "competidores"), where("nombre", "==", r2Name)));
-        snap2.forEach(d => {
-            let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
-            updateDoc(d.ref, { score: actual + totalR2 }); // Actualiza la BD real
-        });
-
-        // 3. Limpieza de pantalla del juez
-        alert("Veredicto enviado exitosamente. Gracias por tu evaluación.");
+        alert(`✅ Veredicto enviado con éxito. El equipo ${ganadorNombre} recibe ${puntosGanados} puntos.`);
+        
+        // 3. Limpiamos y regresamos al juez a la sala de espera
         document.getElementById('juez-modo-espera').classList.remove('hidden');
         document.getElementById('juez-modo-combate').classList.add('hidden');
-        document.getElementById('juez-modo-carrera')?.classList.add('hidden');
         combateTerminado = false;
-        puntos = { r1Golpes: 0, r1Saques: 0, r2Golpes: 0, r2Saques: 0 };
-        
-        ['r1-golpes','r1-saques','r2-golpes','r2-saques'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.textContent = "0";
-        });
-        
-        const btn = document.getElementById('btnEnviarVeredicto');
-        if (btn) {
-            btn.disabled = true;
-            btn.className = "w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl text-xs uppercase tracking-widest cursor-not-allowed transition-colors";
-            btn.innerHTML = "⏳ Esperando fin de combate...";
-        }
+
     } catch (error) {
         console.error("🔥 ERROR REAL DE FIREBASE:", error);
         alert("Error enviando veredicto. Revisa la consola F12.");
     }
-});
+};
 
 
 
