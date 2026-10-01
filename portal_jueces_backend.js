@@ -53,7 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (isAdmin) {
         mostrarPantalla('pantallaAdmin');
         window.cargarDatosAdmin();
-        iniciarRadarSesion(); // <-- NUEVO: Para que siga escuchando si le quitan los poderes
+        iniciarRadarSesion(); 
+        
+        // 🔥 INYECTAR NOMBRE Y ROL AL RECARGAR PÁGINA
+        const esSuper = sessionStorage.getItem('juez_superadmin') === 'true';
+        document.getElementById('subtituloPrincipal').innerHTML = `<span class="font-black text-gray-700">${currentUser}</span><br><span class="text-[10px] text-emerald-600 uppercase tracking-widest">${esSuper ? '👑 Súper Admin (Todas las arenas)' : currentCategory}</span>`;
     }
     // Si ya es juez guardado
     else if (currentUser && currentCategory) {
@@ -62,7 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('categoriaAsignada').textContent = currentCategory;
         iniciarRadarArena();
         iniciarRadarSesion(); 
-    } 
+        
+        // 🔥 INYECTAR TEXTO LIMPIO PARA JUEZ (Sin redundancia)
+        document.getElementById('subtituloPrincipal').innerHTML = `<span class="text-gray-500 text-sm font-semibold uppercase tracking-widest">Panel de Evaluación</span>`;
+    }
     // Si no hay sesión y no hay QR, pedimos login normal
     else {
         mostrarPantalla('loginForm');
@@ -117,11 +124,12 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             
             if (rolUsuario === 'superadmin') {
                 sessionStorage.setItem('juez_superadmin', 'true');
-                document.getElementById('subtituloPrincipal').textContent = `Panel Maestro (Root)`;
+                // 🔥 INYECTAR TEXTO PARA SUPER ADMIN
+                document.getElementById('subtituloPrincipal').innerHTML = `<span class="font-black text-gray-700">${nombre}</span><br><span class="text-[10px] text-emerald-600 uppercase tracking-widest">👑 Súper Admin (Todas las arenas)</span>`;
             } else {
                 sessionStorage.setItem('juez_superadmin', 'false');
-                // Pinta su nombre y categoría bajo "Pelea de robots"
-                document.getElementById('subtituloPrincipal').textContent = `${nombre} - ${currentCategory}`;
+                // 🔥 INYECTAR TEXTO PARA ADMIN NORMAL
+                document.getElementById('subtituloPrincipal').innerHTML = `<span class="font-black text-gray-700">${nombre}</span><br><span class="text-[10px] text-emerald-600 uppercase tracking-widest">${currentCategory}</span>`;
             }
             
             sessionStorage.setItem('admin_token', adminToken);
@@ -221,6 +229,9 @@ function activarSesionDocente(nombre, categoria) {
     sessionStorage.setItem('juez_role', 'juez');
     sessionStorage.setItem('juez_nombre', currentUser);
     sessionStorage.setItem('juez_categoria', currentCategory);
+
+    // 🔥 INYECTAR TEXTO LIMPIO PARA JUEZ (Sin redundancia)
+    document.getElementById('subtituloPrincipal').innerHTML = `<span class="text-gray-500 text-sm font-semibold uppercase tracking-widest">Panel de Evaluación</span>`;
 
     mostrarPantalla('pantallaEspera');
     document.getElementById('nombreAsignado').textContent = currentUser;
@@ -1246,5 +1257,126 @@ canalPanel.onmessage = function(evento) {
             selectR2.value = r2;
             console.log(`✅ ¡Pelea auto-cargada para el Admin de ${cat}!`);
         }, 500);
+    }
+};
+
+// =====================================================================
+// 🏁 MOTOR DE CRONÓMETRO PARA CARRERAS (Seguimiento / Evasor)
+// =====================================================================
+let cronoInterval = null;
+let cronoStartTime = 0;
+let cronoElapsedTime = 0;
+let cronoIsRunning = false;
+let cronoFaltas = 0;
+
+window.toggleCrono = function() {
+    const btn = document.getElementById('btn-start-crono');
+    if (cronoIsRunning) {
+        // PAUSAR
+        clearInterval(cronoInterval);
+        cronoIsRunning = false;
+        btn.innerHTML = "▶ REANUDAR";
+        btn.className = "bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
+    } else {
+        // INICIAR
+        cronoStartTime = Date.now() - cronoElapsedTime;
+        cronoInterval = setInterval(actualizarDisplayCrono, 10); // Actualiza cada 10ms (Centésimas)
+        cronoIsRunning = true;
+        btn.innerHTML = "⏸ PAUSAR";
+        btn.className = "bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
+    }
+};
+
+window.resetCrono = function() {
+    clearInterval(cronoInterval);
+    cronoIsRunning = false;
+    cronoElapsedTime = 0;
+    cronoFaltas = 0;
+    document.getElementById('display-faltas').textContent = "0";
+    const btn = document.getElementById('btn-start-crono');
+    if (btn) {
+        btn.innerHTML = "▶ INICIAR";
+        btn.className = "bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
+    }
+    actualizarDisplayCrono();
+};
+
+window.cambiarFaltas = function(valor) {
+    cronoFaltas += valor;
+    if (cronoFaltas < 0) cronoFaltas = 0;
+    document.getElementById('display-faltas').textContent = cronoFaltas;
+    actualizarDisplayCrono(); // Para que sume los 5s en vivo y el juez lo vea
+};
+
+function actualizarDisplayCrono() {
+    if (cronoIsRunning) {
+        cronoElapsedTime = Date.now() - cronoStartTime;
+    }
+    
+    // Tiempo base (sin faltas)
+    document.getElementById('display-crono').textContent = formatearTiempoMs(cronoElapsedTime);
+    
+    // Tiempo oficial (sumando 5 segundos = 5000ms por cada falta)
+    let tiempoOficialMs = cronoElapsedTime + (cronoFaltas * 5000);
+    document.getElementById('display-final').textContent = formatearTiempoMs(tiempoOficialMs);
+}
+
+function formatearTiempoMs(msTotal) {
+    let date = new Date(msTotal);
+    let m = date.getUTCMinutes().toString().padStart(2, '0');
+    let s = date.getUTCSeconds().toString().padStart(2, '0');
+    let ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0'); // Centésimas
+    return `${m}:${s}.${ms}`;
+}
+
+window.guardarTiempoFirebase = async function() {
+    if (cronoIsRunning) {
+        return alert("⚠️ Por favor, ponle PAUSA al reloj antes de guardar el tiempo.");
+    }
+    
+    // Tomamos el nombre del robot (El Admin lo debe poner en el "Robot 1")
+    const robotName = document.getElementById('juez-robot1').textContent;
+    if (!robotName || robotName === 'R1' || robotName === '') {
+        return alert("⚠️ No hay ningún robot cargado en la arena. Dile al Admin que asigne uno.");
+    }
+    
+    let tiempoOficialMs = cronoElapsedTime + (cronoFaltas * 5000);
+    let tiempoEnSegundos = tiempoOficialMs / 1000;
+    
+    if (tiempoEnSegundos === 0) return alert("⚠️ El tiempo está en ceros. Arranca el reloj primero.");
+    
+    if(!confirm(`🏁 ¿Guardar tiempo oficial de ${tiempoEnSegundos} segundos para el equipo "${robotName}"?`)) return;
+
+    // Cambiamos el botón a estado de carga
+    const btn = document.querySelector('button[onclick="guardarTiempoFirebase()"]');
+    const oldText = btn.innerHTML;
+    btn.innerHTML = "⏳ GUARDANDO...";
+    btn.disabled = true;
+
+    try {
+        // Guardamos el tiempo final en una colección dedicada a las carreras
+        await addDoc(collection(db, "tiempos_carreras"), {
+            categoria: currentCategory, // Ej: "Seguimiento de línea"
+            robot: robotName,
+            tiempo_segundos: tiempoEnSegundos,
+            faltas: cronoFaltas,
+            tiempo_base_ms: cronoElapsedTime,
+            juez: currentUser,
+            timestamp: Date.now()
+        });
+
+        alert(`✅ Tiempo guardado exitosamente.`);
+        
+        // Limpiamos y regresamos a la sala de espera
+        window.resetCrono();
+        document.getElementById('juez-modo-espera').classList.remove('hidden');
+        document.getElementById('juez-modo-carrera').classList.add('hidden');
+
+    } catch (error) {
+        console.error("🔥 Error guardando tiempo:", error);
+        alert("Error al guardar el tiempo en la base de datos.");
+    } finally {
+        btn.innerHTML = oldText;
+        btn.disabled = false;
     }
 };

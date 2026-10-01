@@ -67,6 +67,12 @@ const timeData = { seguimiento: [], evasor: [] };
 const timeParticipants = { seguimiento: [], evasor: [] };
 let docentesMap = {}; 
 let currentSubView = 'menu'; // 🔥 NUEVA VARIABLE PARA RECORDAR DÓNDE ESTAMOS
+window.memoriaScrollX = 0;
+window.memoriaScrollY = 0;
+window.guardarScroll = function(elemento) {
+    window.memoriaScrollX = elemento.scrollLeft;
+    window.memoriaScrollY = elemento.scrollTop;
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // 🛡️ TRUCO: Bloquear el botón físico de "Atrás" del celular o navegador
@@ -76,7 +82,49 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     cargarDatosDesdeServidor();
+    iniciarRadarSesionBrackets(); // 🔥 ENCENDEMOS EL RADAR PARA ESTA PESTAÑA
 });
+
+// =====================================================================
+// 📡 RADAR DE SESIÓN PARA BRACKETS (Sincronización multi-pestaña)
+// =====================================================================
+function iniciarRadarSesionBrackets() {
+    const nombreUsuario = sessionStorage.getItem('juez_nombre');
+    if (!nombreUsuario) return; // Si no hay usuario, no hay nada que vigilar
+
+    const ref = doc(db, "maestros_autorizados", nombreUsuario);
+    onSnapshot(ref, (docSnap) => {
+        if (!docSnap.exists()) return;
+        const data = docSnap.data();
+        const rolActualEnPantalla = sessionStorage.getItem('juez_role');
+        const catActualEnPantalla = sessionStorage.getItem('juez_categoria');
+        const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+
+        // 1. EXPULSIÓN O CAMBIO DE CONTRASEÑA (Cierre de sesión forzado)
+        if (data.sesion_activa === false) {
+            sessionStorage.clear();
+            alert("🚪 Tu sesión ha sido cerrada o modificada por el sistema.");
+            window.location.href = 'portal_jueces.html';
+            return;
+        }
+
+        // 2. DESCENSO: Le quitaron el rango de Admin
+        if (rolActualEnPantalla === 'admin' && data.rol !== 'admin' && data.rol !== 'superadmin') {
+            sessionStorage.clear();
+            alert("🥲 Ya no eres administrador. Regresando al portal de jueces...");
+            window.location.href = 'portal_jueces.html';
+            return;
+        }
+
+        // 3. CAMBIO DE CATEGORÍA (Admin normal)
+        if (!isSuperAdmin && data.categoria && data.categoria !== catActualEnPantalla) {
+            sessionStorage.setItem('juez_categoria', data.categoria);
+            alert("🔄 Tu categoría asignada ha sido actualizada por el Súper Admin.");
+            window.location.href = 'brackets.html'; // Recargamos limpio para que lea su nueva categoría
+            return;
+        }
+    });
+}
 
 
 
@@ -410,29 +458,30 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
         }
     }
 
+    if (phase === 'round1') {
+        const loser = match.winner === match.player1 ? match.player2 : (match.winner === match.player2 ? match.player1 : null);
+        const repMatchIdx = Math.floor(matchIdx / 2);
+        const isPlayer1 = matchIdx % 2 === 0;
+        const repMatch = data.repechageMatches[repMatchIdx];
+
+        if (repMatch) {
+            if (isPlayer1) {
+                repMatch.player1 = loser;
+                if (!loser && repMatch.winner === repMatch.player1) repMatch.winner = null;
+            } else {
+                repMatch.player2 = loser;
+                if (!loser && repMatch.winner === repMatch.player2) repMatch.winner = null;
+            }
+        }
+    }
+
     if (phase === 'round1' || phase === 'repechage') checkPhase1Completion(data);
     else updateLaterRoundsCascading(data);
 
-    // 🛑 TRUCO DEFINITIVO (SIN PARPADEO):
-    const bracketArea = document.getElementById('bracket-area');
-    const scrollX = bracketArea ? bracketArea.scrollLeft : 0;
-    const scrollYInternal = bracketArea ? bracketArea.scrollTop : 0;
-    
-    // Congelamos la altura exacta para que la página no brinque ni un milímetro
-    const container = document.getElementById('tournament-' + cat);
-    if (container) container.style.height = container.offsetHeight + 'px'; 
-
-    // Actualizamos los datos
+    // Actualizamos los datos visuales (que ahora ya saben cómo cuidar su propio scroll)
     renderTournament(cat, subView);
 
-    // Restauramos TODO instantáneamente (sin setTimeout)
-    const newBracketArea = document.getElementById('bracket-area');
-    if (newBracketArea) {
-        newBracketArea.scrollLeft = scrollX;
-        newBracketArea.scrollTop = scrollYInternal;
-    }
-    if (container) container.style.height = ''; // Descongelamos altura
-
+    // Guardamos en la nube
     guardarBracketFirebase(cat);
 };
 
@@ -494,7 +543,6 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
         return;
     }
 
-    // --- BARRA DE BOTONES (Centrada y ajustada) ---
     const isArena = !!document.fullscreenElement;
     let html = `
     <div id="arena-header" class="mb-6 w-full grid grid-cols-3 items-center bg-white p-3 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
@@ -517,13 +565,11 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
 
     <!-- CONTENEDOR MODO ARENA -->
     <div id="arena-workspace" class="flex w-full h-[85vh] gap-6 transition-all duration-300 ${isArena ? 'p-6 bg-gray-50' : ''}">
-        <div class="relative w-full bg-white rounded-3xl shadow-lg border border-gray-200 overflow-auto flex-grow" id="bracket-area">`;
+        <div onscroll="window.guardarScroll(this)" class="relative w-full bg-white rounded-3xl shadow-lg border border-gray-200 overflow-auto flex-grow" id="bracket-area">`;
 
-    // --- DETECTAR SI ES PELEA O CARRERA ---
     const isCarrera = cat === 'Seg. de línea' || cat === 'Evasor';
 
     if (isCarrera) {
-        // 🏁 TABLA TIPO FÓRMULA 1 PARA PISTAS (Animada)
         html += `<div class="w-full max-w-4xl mx-auto mt-8 flex flex-col gap-3 pb-20">
                     <div class="grid grid-cols-12 gap-4 px-6 py-3 bg-emerald-800 text-white font-black text-xs uppercase tracking-widest rounded-t-2xl shadow-md">
                         <div class="col-span-1 text-center">POS</div>
@@ -533,18 +579,17 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
                         <div class="col-span-2 text-right">TIEMPO FINAL</div>
                     </div>`;
         
-        // Simulación de datos (Mientras conectas Firebase)
         const dummyData = data.participants.map((p, i) => ({ 
             name: p, base: (30 + i*2), penaltis: (i%2===0?1:0) 
         }));
-        // Ordenar por tiempo final (Base + 5s por penalización)
+        
         dummyData.sort((a,b) => (a.base + a.penaltis*5) - (b.base + b.penaltis*5));
 
         dummyData.forEach((robot, index) => {
             let finalTime = robot.base + (robot.penaltis * 5);
             let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
             let color = index === 0 ? 'bg-amber-100 border-amber-300' : 'bg-white border-gray-200';
-            let delay = index * 0.1; // Efecto cascada
+            let delay = index * 0.1; 
 
             html += `
             <div class="grid grid-cols-12 gap-4 px-6 py-4 items-center ${color} border rounded-xl shadow-sm modal-content" style="animation-delay: ${delay}s">
@@ -561,7 +606,6 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
         html += `</div>`;
 
     } else if (subView === 'phase1') {
-        // --- RENDERIZADO NORMAL DE BRACKETS PARA COMBATES ---
         html += `<div class="bracket-wrapper min-w-max justify-center">`;
         
         const r1Total = data.round1Matches.length;
@@ -569,13 +613,11 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
         const leftR1 = data.round1Matches.slice(0, halfR1);
         const rightR1 = data.round1Matches.slice(halfR1);
 
-        // LADO IZQUIERDO (Mitad 1 de Ronda 1)
         html += `<div class="bracket-col">
                     <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
         leftR1.forEach((m, idx) => { html += renderMatchBox(cat, 'round1', idx, m, subView); });
         html += `</div>`;
 
-        // CENTRO (Repechaje Enmarcado)
         if (data.repechageMatches && data.repechageMatches.length > 0) {
             html += `<div class="bracket-col justify-start px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8 min-h-full">
                         <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Repechaje</h4>`;
@@ -583,7 +625,6 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
             html += `</div>`;
         }
 
-        // LADO DERECHO (Mitad 2 de Ronda 1)
         if (rightR1.length > 0) {
             html += `<div class="bracket-col">
                         <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
@@ -601,21 +642,18 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
         const roundTitles = ["Ronda 2", "Octavos", "Cuartos", "Semifinal"];
         const totalRounds = data.laterRounds.length;
         
-        // LADO IZQUIERDO (Mitad 1)
         for (let rIdx = 0; rIdx < totalRounds - 1; rIdx++) {
             let matches = data.laterRounds[rIdx];
             let leftMatches = matches.slice(0, matches.length / 2);
             let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
             let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
             
-            // Etiqueta .col-left para las líneas correctas
             html += `<div class="bracket-col col-left">
                         <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">${phaseTitle}</h4>`;
             leftMatches.forEach((m, idx) => { html += renderMatchBox(cat, 'laterRounds', [rIdx, idx], m, subView); });
             html += `</div>`;
         }
 
-        // CENTRO (Gran Final y Campeón)
         html += `<div class="bracket-col justify-center px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/30 rounded-3xl pb-8">
                     <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-amber-600 uppercase tracking-widest border-b-2 border-amber-200 pb-2">Gran Final</h4>`;
         let finalMatch = data.laterRounds[totalRounds - 1][0];
@@ -632,14 +670,12 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
         }
         html += `</div>`;
 
-        // LADO DERECHO (Mitad 2, orden invertido para el efecto Espejo)
         for (let rIdx = totalRounds - 2; rIdx >= 0; rIdx--) {
             let matches = data.laterRounds[rIdx];
             let rightMatches = matches.slice(matches.length / 2);
             let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
             let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
             
-            // Etiqueta .col-right para que las líneas apunten a la izquierda
             html += `<div class="bracket-col col-right">
                         <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">${phaseTitle}</h4>`;
             rightMatches.forEach((m, idx) => { 
@@ -657,17 +693,14 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
             <h2 class="text-2xl font-black text-center text-gray-800 mb-4 uppercase tracking-tighter pb-2 border-b-2 border-gray-100">🏆 Tabla General</h2>
             <div class="flex-grow overflow-y-auto flex flex-col gap-3 pr-2">`;
             
-    // 🧠 MAGIA: Puntos Exclusivos del Juez
     let scores = {};
     data.participants.forEach(p => {
-        // Lee los puntos reales de la base de datos (0 si el juez no ha calificado)
         scores[p] = (data.puntosTotales && data.puntosTotales[p]) ? data.puntosTotales[p] : 0;
     });
     
-    // Ordenar de mayor a menor puntaje
+    // 🔥 Corrección del signo de resta
     let ranking = Object.keys(scores).map(name => ({ name, score: scores[name] })).sort((a,b) => b.score - a.score);
 
-    // Dibujar Tarjetas de Posición
     ranking.forEach((robot, index) => {
         let medal = index + 1;
         if (index === 0 && robot.score > 0) medal = '🥇';
@@ -695,8 +728,23 @@ window.renderTournament = function renderTournament(cat, subView = 'menu') {
             </button>
         </div>
     </div>`; 
+    
     container.innerHTML = html;
-}
+
+    // 🛑 MAGIA ANTI-SALTOS DEFINITIVA: Recuperamos la memoria global
+    const newBracketArea = document.getElementById('bracket-area');
+    if (newBracketArea) {
+        newBracketArea.scrollLeft = window.memoriaScrollX;
+        newBracketArea.scrollTop = window.memoriaScrollY;
+        
+        setTimeout(() => {
+            if(newBracketArea) {
+                newBracketArea.scrollLeft = window.memoriaScrollX;
+                newBracketArea.scrollTop = window.memoriaScrollY;
+            }
+        }, 15);
+    }
+};
 
 function renderMatchBox(cat, phase, matchIdx, match, subView) {
     const renderRow = (player, isOpponentNull, isThisRowTheNullOne) => {
