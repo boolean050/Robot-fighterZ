@@ -1042,6 +1042,39 @@ function fmt(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); cons
 window.exportAllToExcel = () => {
     const wb = XLSX.utils.book_new();
 
+    // 🎨 DICCIONARIO DE ESTILOS PREMIUM
+    const styleHeader = {
+        font: { bold: true, color: { rgb: "FFFFFFFF" }, sz: 12 },
+        fill: { fgColor: { rgb: "FF047857" } }, // Verde FIME (Emerald 700)
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "medium", color: { rgb: "FF064E3B" } }, bottom: { style: "medium", color: { rgb: "FF064E3B" } } }
+    };
+
+    const styleColPosicion = { fill: { fgColor: { rgb: "FFF8FAFC" } }, alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, color: { rgb: "FF475569" } } };
+    const styleColNombre = { fill: { fgColor: { rgb: "FFFFFFFF" } }, alignment: { horizontal: "left", vertical: "center" }, font: { bold: true, color: { rgb: "FF1E293B" } } };
+    const styleColPuntos = { fill: { fgColor: { rgb: "FFF0FDF4" } }, alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, color: { rgb: "FF166534" } } };
+
+    // Función inyectora de colores
+    const applyStyles = (ws) => {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const address = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[address]) continue;
+
+                if (R === 0) {
+                    ws[address].s = styleHeader; // Fila 0 es el encabezado
+                } else {
+                    if (C === 0) ws[address].s = styleColPosicion;
+                    if (C === 1) ws[address].s = styleColNombre;
+                    if (C === 2) ws[address].s = styleColPuntos;
+                }
+            }
+        }
+        // Ancho de las columnas
+        ws['!cols'] = [{ wch: 12 }, { wch: 35 }, { wch: 28 }];
+    };
+
     // 1. PROCESAR CATEGORÍAS DE COMBATE (Por Puntos)
     const categoriasCombate = [
         { id: 'pequenos', nombre: 'Pequeños' },
@@ -1053,7 +1086,6 @@ window.exportAllToExcel = () => {
         let rows = [['Posición', 'Robot / Equipo', 'Puntos Totales']];
         const data = tournamentData[cat.id];
 
-        // Si la categoría tiene equipos, los procesamos
         if (data && data.participants && data.participants.length > 0) {
             let scores = [];
             data.participants.forEach(p => {
@@ -1064,10 +1096,12 @@ window.exportAllToExcel = () => {
                 rows.push([r.score > 0 ? (idx + 1) : '-', r.name, r.score]);
             });
         } else {
-            // Si está vacía, ponemos una fila de aviso para que la tabla no esté en blanco
             rows.push(['-', 'Aún no hay equipos registrados', '-']);
         }
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cat.nombre);
+        
+        let ws = XLSX.utils.aoa_to_sheet(rows);
+        applyStyles(ws);
+        XLSX.utils.book_append_sheet(wb, ws, cat.nombre);
     });
 
     // 2. PROCESAR CATEGORÍAS DE CARRERA (Por Tiempo)
@@ -1093,12 +1127,16 @@ window.exportAllToExcel = () => {
                 return a.time - b.time;
             });
             tiempos.forEach((r, idx) => {
-                rows.push([r.time ? (idx + 1) : '-', r.name, r.time ? r.time : "Sin tiempo"]);
+                let tiempoFormat = r.time ? Number(r.time).toFixed(2) : "Sin tiempo";
+                rows.push([r.time ? (idx + 1) : '-', r.name, tiempoFormat]);
             });
         } else {
             rows.push(['-', 'Aún no hay equipos registrados', '-']);
         }
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cat.nombre);
+        
+        let ws = XLSX.utils.aoa_to_sheet(rows);
+        applyStyles(ws);
+        XLSX.utils.book_append_sheet(wb, ws, cat.nombre);
     });
 
     XLSX.writeFile(wb, 'Resultados_Guerra_Robots_FIME.xlsx');

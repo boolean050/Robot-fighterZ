@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <!-- <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script> -->
     <script type="module" src="portal_jueces_backend.js"></script>
     <title>FIME - Portal de Jueces</title>
 </head>
@@ -222,8 +223,8 @@
 
         <!-- CONTROLES CIRCULARES -->
         <div class="flex items-center justify-center gap-6 mb-8 w-full">
-            <!-- Pausa (Izquierda) -->
-            <button onclick="pausarCrono()" class="w-14 h-14 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full flex items-center justify-center shadow transition-transform active:scale-90" title="Pausar">
+            <!-- Pausa (Izquierda) - AHORA ES ROJO -->
+            <button onclick="pausarCrono()" class="w-14 h-14 bg-red-100 hover:bg-red-200 text-red-600 rounded-full flex items-center justify-center shadow transition-transform active:scale-90" title="Pausar">
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
             
@@ -232,8 +233,8 @@
                 <svg class="w-10 h-10 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             </button>
 
-            <!-- Reiniciar (Derecha) -->
-            <button onclick="resetCrono()" class="w-14 h-14 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full flex items-center justify-center shadow transition-transform active:scale-90" title="Reiniciar">
+            <!-- Reiniciar (Derecha) - AHORA ES AMARILLO -->
+            <button onclick="resetCrono()" class="w-14 h-14 bg-amber-100 hover:bg-amber-200 text-amber-600 rounded-full flex items-center justify-center shadow transition-transform active:scale-90" title="Reiniciar">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </button>
         </div>
