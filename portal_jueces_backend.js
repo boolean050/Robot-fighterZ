@@ -481,7 +481,6 @@ window.cargarDatosAdmin = function() {
                 </tr>`;
             });
         }
-        actualizarDropdownsRobots();
     });
 };
 
@@ -634,29 +633,33 @@ function activarModoCombate(data) {
     document.getElementById('juez-modo-espera').classList.add('hidden');
     
     const categoriaJuez = sessionStorage.getItem('juez_categoria') || ''; 
-    const isCarrera = categoriaJuez === 'Evasor' || categoriaJuez === 'Seg. de línea' || categoriaJuez.includes('Línea');
+    const catMin = categoriaJuez.toLowerCase();
+    const isCarrera = catMin.includes('segui') || catMin.includes('evasor') || catMin.includes('línea') || catMin.includes('linea');
 
     if (isCarrera) {
         document.getElementById('juez-modo-combate').classList.add('hidden');
         document.getElementById('juez-modo-carrera').classList.remove('hidden');
+        document.getElementById('juez-modo-carrera').classList.add('flex');
+        // Inyectamos el nombre del robot que mandó el admin
+        const labelCarrera = document.getElementById('carrera-robot-name');
+        if (labelCarrera) labelCarrera.textContent = data.robot1 || '-- ROBOT --';
     } else {
         document.getElementById('juez-modo-combate').classList.remove('hidden');
         document.getElementById('juez-modo-carrera').classList.add('hidden');
-    }
-    
-    document.getElementById('juez-robot1').textContent = data.robot1;
-    document.getElementById('juez-robot2').textContent = data.robot2;
-    
-    // 🔥 NOMBRES EN LOS BOTONES GIGANTES
-    const lblR1 = document.getElementById('btn-lbl-r1');
-    const lblR2 = document.getElementById('btn-lbl-r2');
-    if(lblR1) lblR1.textContent = data.robot1;
-    if(lblR2) lblR2.textContent = data.robot2;
+        document.getElementById('juez-modo-carrera').classList.remove('flex');
+        
+        document.getElementById('juez-robot1').textContent = data.robot1;
+        document.getElementById('juez-robot2').textContent = data.robot2;
+        
+        const lblR1 = document.getElementById('btn-lbl-r1');
+        const lblR2 = document.getElementById('btn-lbl-r2');
+        if(lblR1) lblR1.textContent = data.robot1;
+        if(lblR2) lblR2.textContent = data.robot2;
 
-    combateTerminado = false;
-    if(timerInterval) clearInterval(timerInterval);
-    
-    iniciarCronometro(data.tiempo_inicio);
+        combateTerminado = false;
+        if(timerInterval) clearInterval(timerInterval);
+        iniciarCronometro(data.tiempo_inicio);
+    }
 }
 
 
@@ -755,200 +758,70 @@ window.enviarVeredictoFinal = async function(ladoGanador, metodo) {
     const ganadorNombre = ladoGanador === 'r1' ? r1Name : r2Name;
     const puntosGanados = metodo === 'ko' ? 5 : 3;
     
-    if(!confirm(`¿Declarar a ${ganadorNombre} como ganador oficial por ${metodo.toUpperCase()} (+${puntosGanados} pts)?`)) return;
-
-    // Mantener estructura original de puntos para no romper otras funciones
-    let puntosEstructura = { r1Golpes: 0, r1Saques: 0, r2Golpes: 0, r2Saques: 0 };
-    if (ladoGanador === 'r1') {
-        puntosEstructura.r1Golpes = puntosGanados; 
-    } else {
-        puntosEstructura.r2Golpes = puntosGanados; 
-    }
-
-    const payload = {
-        juez: currentUser,
-        categoria: catMap[currentCategory],
-        robot1: r1Name,
-        robot2: r2Name,
-        puntos: puntosEstructura, 
-        timestamp: Date.now(),
-        ganador_declarado: ganadorNombre,
-        metodo_victoria: metodo
-    };
-
-    try {
-        // 1. Guardamos el recibo
-        await addDoc(collection(db, "veredictos"), payload);
-
-        // 2. Sumamos los puntos al ganador
-        const snapGanador = await getDocs(query(collection(db, "competidores"), where("nombre", "==", ganadorNombre)));
-        snapGanador.forEach(d => {
-            let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
-            updateDoc(d.ref, { score: actual + puntosGanados }); 
-        });
-
-        alert(`✅ Veredicto enviado con éxito. El equipo ${ganadorNombre} recibe ${puntosGanados} puntos.`);
+    // 🔥 AQUÍ ENTRA EL MODAL EN LUGAR DEL VIEJO CONFIRM
+    abrirModalConfirmar(`¿Declarar a ${ganadorNombre} como ganador oficial por ${metodo.toUpperCase()} (+${puntosGanados} pts)?`, async () => {
         
-        // 3. Limpiamos y regresamos al juez a la sala de espera
-        document.getElementById('juez-modo-espera').classList.remove('hidden');
-        document.getElementById('juez-modo-combate').classList.add('hidden');
-        combateTerminado = false;
+        // Mantener estructura original de puntos para no romper otras funciones
+        let puntosEstructura = { r1Golpes: 0, r1Saques: 0, r2Golpes: 0, r2Saques: 0 };
+        if (ladoGanador === 'r1') {
+            puntosEstructura.r1Golpes = puntosGanados; 
+        } else {
+            puntosEstructura.r2Golpes = puntosGanados; 
+        }
 
-    } catch (error) {
-        console.error("🔥 ERROR REAL DE FIREBASE:", error);
-        alert("Error enviando veredicto. Revisa la consola F12.");
-    }
+        const payload = {
+            juez: currentUser,
+            categoria: catMap[currentCategory],
+            robot1: r1Name,
+            robot2: r2Name,
+            puntos: puntosEstructura, 
+            timestamp: Date.now(),
+            ganador_declarado: ganadorNombre,
+            metodo_victoria: metodo
+        };
+
+        try {
+            // 1. Guardamos el recibo
+            await addDoc(collection(db, "veredictos"), payload);
+
+            // 2. Sumamos los puntos al ganador en el Padrón
+            const snapGanador = await getDocs(query(collection(db, "competidores"), where("nombre", "==", ganadorNombre)));
+            snapGanador.forEach(d => {
+                let actual = Number(d.data().score || d.data().puntos || d.data().puntaje || 0);
+                updateDoc(d.ref, { score: actual + puntosGanados }); 
+            });
+
+            // 🔥 3. ENVIAR EL GANADOR A LA ARENA Y APAGARLA (MAGIA PARA BRACKETS)
+            const catTag = obtenerTagExacto(currentCategory);
+            if (catTag) {
+                await updateDoc(doc(db, "arenas", catTag), { 
+                    estado: 'inactivo',
+                    ganador_automatico: ganadorNombre 
+                });
+            }
+
+            // 🔥 4. MODIFICAR EL MODAL PARA MOSTRAR AL CAMPEÓN
+            const modalExito = document.getElementById('modalExitoVeredicto');
+            if (modalExito) {
+                // Buscamos el párrafo que dice "Respuestas guardadas con éxito"
+                const parrafoExito = modalExito.querySelector('p');
+                if (parrafoExito) {
+                    parrafoExito.innerHTML = `Respuestas guardadas con éxito.<br><br><span class="text-emerald-700 font-black uppercase text-sm">🏆 El ganador de la ronda es: ${ganadorNombre}</span>`;
+                }
+            }
+
+            // 5. Limpiamos y activamos el Modal de Éxito 🎉
+            combateTerminado = false;
+            mostrarExitoTemporal();
+
+        } catch (error) {
+            console.error("🔥 ERROR REAL DE FIREBASE:", error);
+            alert("Error enviando veredicto. Revisa la consola F12.");
+        }
+    }); // <-- Aquí cierra el abrirModalConfirmar
 };
 
 
-
-// ====================================================================
-// --- 6. LÓGICA DE COMBATE Y BLOQUEO CRUZADO DE ROBOTS ---
-// ====================================================================
-
-// Traductor universal a prueba de fallos (Sincroniza Admin y Jueces perfectamente)
-function obtenerTagExacto(categoria) {
-    if(!categoria) return 'sin_categoria';
-    let base = categoria.toLowerCase().trim();
-    if(catMap[categoria]) return catMap[categoria];
-    for(let key in catMap) {
-        if(base.includes(key.toLowerCase()) || key.toLowerCase().includes(base)) return catMap[key];
-    }
-    return base;
-}
-
-// Bloquea visualmente (en gris) al robot rival para no repetirlo
-function sincronizarSelects() {
-    const selectR1 = document.getElementById('admin-r1-input');
-    const selectR2 = document.getElementById('admin-r2-input');
-    if(!selectR1 || !selectR2) return;
-
-    const val1 = selectR1.value;
-    const val2 = selectR2.value;
-
-    // Limpiar y checar Robot 1
-    Array.from(selectR1.options).forEach(opt => {
-        if(opt.value !== "" && opt.value === val2) {
-            opt.disabled = true;
-            opt.style.color = '#cbd5e1'; // Gris clarito
-        } else {
-            opt.disabled = false;
-            opt.style.color = ''; // Color normal
-        }
-    });
-
-    // Limpiar y checar Robot 2
-    Array.from(selectR2.options).forEach(opt => {
-        if(opt.value !== "" && opt.value === val1) {
-            opt.disabled = true;
-            opt.style.color = '#cbd5e1'; // Gris clarito
-        } else {
-            opt.disabled = false;
-            opt.style.color = ''; // Color normal
-        }
-    });
-}
-
-// Activar la sincronización cuando el admin cambie la selección
-document.getElementById('admin-r1-input')?.addEventListener('change', sincronizarSelects);
-document.getElementById('admin-r2-input')?.addEventListener('change', sincronizarSelects);
-
-// Cargar los robots en las listas azules y rojas
-window.actualizarDropdownsRobots = function() {
-    const catSelect = document.getElementById('admin-arena-select')?.value;
-    const selectR1 = document.getElementById('admin-r1-input');
-    const selectR2 = document.getElementById('admin-r2-input');
-    if(!selectR1 || !selectR2 || !catSelect) return;
-
-    selectR1.innerHTML = '<option value="">-- ROBOT 1 --</option>';
-    selectR2.innerHTML = '<option value="">-- ROBOT 2 --</option>';
-    
-    let tagBuscado = obtenerTagExacto(catSelect);
-    
-    todosLosRobots.filter(r => (r.categoria_tag === tagBuscado) || ((r.categoria_original || '').toLowerCase() === catSelect.toLowerCase().trim()))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
-        .forEach(r => {
-            selectR1.insertAdjacentHTML('beforeend', `<option value="${r.nombre}">${r.nombre}</option>`);
-            selectR2.insertAdjacentHTML('beforeend', `<option value="${r.nombre}">${r.nombre}</option>`);
-        });
-        
-    sincronizarSelects(); // Limpiamos por si había basura visual guardada
-};
-
-// ====================================================================
-// --- BOTONES DE CONTROL DE ARENA (Hablando el idioma del Juez) ---
-// ====================================================================
-
-document.getElementById('btnAdminIniciarArena')?.addEventListener('click', async () => {
-    const catSelect = document.getElementById('admin-arena-select')?.value;
-    const r1 = document.getElementById('admin-r1-input')?.value;
-    const r2 = document.getElementById('admin-r2-input')?.value;
-
-    if (!catSelect || !r1 || !r2) return alert("⚠️ Selecciona la categoría y ambos robots.");
-    if (r1 === r2) return alert("❌ Un robot no puede pelear contra sí mismo.");
-
-    let tag = obtenerTagExacto(catSelect);
-
-    try {
-        // AHORA SÍ: Mandamos las variables EXACTAS y el tiempo en segundos (/ 1000)
-        await setDoc(doc(db, "arenas", tag), { 
-            robot1: r1, 
-            robot2: r2, 
-            estado: 'peleando',
-            tiempo_inicio: Date.now() / 1000 
-        });
-
-        // Efecto visual para el Admin
-        const btn = document.getElementById('btnAdminIniciarArena');
-        btn.className = "flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all cursor-not-allowed";
-        btn.innerHTML = "⏳ Combate en Curso...";
-        btn.disabled = true;
-
-        if (adminCombatTimeout) clearTimeout(adminCombatTimeout);
-        adminCombatTimeout = setTimeout(resetearBotonAdmin, 300000);
-
-    } catch(e) { alert("Error de conexión con la arena."); }
-});
-
-document.getElementById('btnAdminKO')?.addEventListener('click', async () => {
-    const catSelect = document.getElementById('admin-arena-select')?.value;
-    if (!catSelect) return;
-    if(!confirm("🥊 ¿Declarar K.O.? (Esto detendrá las evaluaciones de los jueces en sus pantallas)")) return;
-    
-    let tag = obtenerTagExacto(catSelect);
-    try { 
-        await updateDoc(doc(db, "arenas", tag), { estado: 'ko' }); 
-        resetearBotonAdmin();
-    } catch(e) {}
-});
-
-document.getElementById('btnAdminLimpiar')?.addEventListener('click', async () => {
-    const catSelect = document.getElementById('admin-arena-select')?.value;
-    if (!catSelect) return;
-    
-    let tag = obtenerTagExacto(catSelect);
-    try {
-        // Sobrescribimos el documento con datos vacíos para matar al "fantasma" de Firebase
-        await setDoc(doc(db, "arenas", tag), { robot1: '', robot2: '', estado: 'inactivo' });
-        
-        document.getElementById('admin-r1-input').value = '';
-        document.getElementById('admin-r2-input').value = '';
-        sincronizarSelects(); 
-        resetearBotonAdmin();
-    } catch(e) {}
-});
-
-function resetearBotonAdmin() {
-    if(adminCombatTimeout) clearTimeout(adminCombatTimeout);
-    const btn = document.getElementById('btnAdminIniciarArena');
-    if(btn) {
-        btn.disabled = false;
-        btn.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
-        btn.innerHTML = "▶️ Iniciar";
-    }
-}
-
-document.getElementById('admin-arena-select')?.addEventListener('change', actualizarDropdownsRobots);
 
 
 // --- 6. EXCEL MASIVO PARA EQUIPOS (IGNORANDO MARCA TEMPORAL) ---
@@ -1208,12 +1081,32 @@ document.getElementById('btnGuardarNuevoEquipo')?.addEventListener('click', asyn
     }
 });
 
+// --- TRADUCTOR UNIVERSAL (Restaurado) ---
+window.obtenerTagExacto = function(categoria) {
+    if(!categoria) return 'sin_categoria';
+    let base = categoria.toLowerCase().trim();
+    if(catMap[categoria]) return catMap[categoria];
+    for(let key in catMap) {
+        if(base.includes(key.toLowerCase()) || key.toLowerCase().includes(base)) return catMap[key];
+    }
+    return base;
+}
+
+// --- TRADUCTOR UNIVERSAL (Restaurado para que no haya errores) ---
+window.obtenerTagExacto = function(categoria) {
+    if(!categoria) return 'sin_categoria';
+    let base = categoria.toLowerCase().trim();
+    if(catMap[categoria]) return catMap[categoria];
+    for(let key in catMap) {
+        if(base.includes(key.toLowerCase()) || key.toLowerCase().includes(base)) return catMap[key];
+    }
+    return base;
+}
+
 // --- PUENTE HACIA LOS BRACKETS ---
 document.getElementById('btnIrABrackets')?.addEventListener('click', () => {
-    const miCat = sessionStorage.getItem('juez_categoria');
-    if (!miCat) return alert("Error: No tienes categoría asignada.");
-    const tag = obtenerTagExacto(miCat);
-    window.location.href = `brackets.html?cat=${tag}`;
+    // TODOS van al Lobby. El Lobby decidirá qué mostrarles.
+    window.location.href = 'brackets.html';
 });
 
 // =====================================================================
@@ -1260,30 +1153,69 @@ canalPanel.onmessage = function(evento) {
     }
 };
 
+
 // =====================================================================
-// 🏁 MOTOR DE CRONÓMETRO PARA CARRERAS (Seguimiento / Evasor)
+// 🌟 MODALES UNIVERSALES
+// =====================================================================
+let accionPendienteVeredicto = null;
+
+window.abrirModalConfirmar = function(mensaje, callback) {
+    document.getElementById('texto-confirmar-veredicto').textContent = mensaje;
+    accionPendienteVeredicto = callback;
+    const modal = document.getElementById('modalConfirmarVeredicto');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.setAttribute('data-show', 'true'), 10);
+};
+
+window.cerrarModalConfirmar = function() {
+    const modal = document.getElementById('modalConfirmarVeredicto');
+    modal.removeAttribute('data-show');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+    accionPendienteVeredicto = null;
+};
+
+document.getElementById('btnAceptarVeredicto')?.addEventListener('click', () => {
+    if (accionPendienteVeredicto) {
+        accionPendienteVeredicto(); 
+        cerrarModalConfirmar();
+    }
+});
+
+window.mostrarExitoTemporal = function() {
+    const modal = document.getElementById('modalExitoVeredicto');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.setAttribute('data-show', 'true'), 10);
+    
+    setTimeout(() => {
+        modal.removeAttribute('data-show');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+        
+        document.getElementById('juez-modo-espera').classList.remove('hidden');
+        document.getElementById('juez-modo-combate').classList.add('hidden');
+        document.getElementById('juez-modo-carrera')?.classList.add('hidden');
+    }, 2000);
+};
+
+// =====================================================================
+// 🏁 MOTOR DE CRONÓMETRO CIRCULAR (Carreras)
 // =====================================================================
 let cronoInterval = null;
 let cronoStartTime = 0;
 let cronoElapsedTime = 0;
 let cronoIsRunning = false;
-let cronoFaltas = 0;
 
-window.toggleCrono = function() {
-    const btn = document.getElementById('btn-start-crono');
+window.iniciarCrono = function() {
+    if (!cronoIsRunning) {
+        cronoStartTime = Date.now() - cronoElapsedTime;
+        cronoInterval = setInterval(actualizarDisplayCrono, 10);
+        cronoIsRunning = true;
+    }
+};
+
+window.pausarCrono = function() {
     if (cronoIsRunning) {
-        // PAUSAR
         clearInterval(cronoInterval);
         cronoIsRunning = false;
-        btn.innerHTML = "▶ REANUDAR";
-        btn.className = "bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
-    } else {
-        // INICIAR
-        cronoStartTime = Date.now() - cronoElapsedTime;
-        cronoInterval = setInterval(actualizarDisplayCrono, 10); // Actualiza cada 10ms (Centésimas)
-        cronoIsRunning = true;
-        btn.innerHTML = "⏸ PAUSAR";
-        btn.className = "bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
     }
 };
 
@@ -1291,92 +1223,45 @@ window.resetCrono = function() {
     clearInterval(cronoInterval);
     cronoIsRunning = false;
     cronoElapsedTime = 0;
-    cronoFaltas = 0;
-    document.getElementById('display-faltas').textContent = "0";
-    const btn = document.getElementById('btn-start-crono');
-    if (btn) {
-        btn.innerHTML = "▶ INICIAR";
-        btn.className = "bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase tracking-widest shadow-md transition-colors active:scale-95";
-    }
     actualizarDisplayCrono();
 };
 
-window.cambiarFaltas = function(valor) {
-    cronoFaltas += valor;
-    if (cronoFaltas < 0) cronoFaltas = 0;
-    document.getElementById('display-faltas').textContent = cronoFaltas;
-    actualizarDisplayCrono(); // Para que sume los 5s en vivo y el juez lo vea
-};
-
 function actualizarDisplayCrono() {
-    if (cronoIsRunning) {
-        cronoElapsedTime = Date.now() - cronoStartTime;
-    }
+    if (cronoIsRunning) cronoElapsedTime = Date.now() - cronoStartTime;
     
-    // Tiempo base (sin faltas)
-    document.getElementById('display-crono').textContent = formatearTiempoMs(cronoElapsedTime);
-    
-    // Tiempo oficial (sumando 5 segundos = 5000ms por cada falta)
-    let tiempoOficialMs = cronoElapsedTime + (cronoFaltas * 5000);
-    document.getElementById('display-final').textContent = formatearTiempoMs(tiempoOficialMs);
-}
-
-function formatearTiempoMs(msTotal) {
-    let date = new Date(msTotal);
+    let date = new Date(cronoElapsedTime);
     let m = date.getUTCMinutes().toString().padStart(2, '0');
     let s = date.getUTCSeconds().toString().padStart(2, '0');
-    let ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0'); // Centésimas
-    return `${m}:${s}.${ms}`;
+    let ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+    document.getElementById('display-crono').textContent = `${m}:${s}:${ms}`;
 }
 
-window.guardarTiempoFirebase = async function() {
-    if (cronoIsRunning) {
-        return alert("⚠️ Por favor, ponle PAUSA al reloj antes de guardar el tiempo.");
-    }
+window.intentarGuardarTiempo = function() {
+    if (cronoIsRunning) return alert("⚠️ Ponle PAUSA al reloj antes de enviar.");
+    const robotName = document.getElementById('carrera-robot-name').textContent;
+    if (!robotName || robotName === '-- ROBOT --') return alert("⚠️ No hay robot en pista.");
     
-    // Tomamos el nombre del robot (El Admin lo debe poner en el "Robot 1")
-    const robotName = document.getElementById('juez-robot1').textContent;
-    if (!robotName || robotName === 'R1' || robotName === '') {
-        return alert("⚠️ No hay ningún robot cargado en la arena. Dile al Admin que asigne uno.");
-    }
-    
-    let tiempoOficialMs = cronoElapsedTime + (cronoFaltas * 5000);
-    let tiempoEnSegundos = tiempoOficialMs / 1000;
-    
-    if (tiempoEnSegundos === 0) return alert("⚠️ El tiempo está en ceros. Arranca el reloj primero.");
-    
-    if(!confirm(`🏁 ¿Guardar tiempo oficial de ${tiempoEnSegundos} segundos para el equipo "${robotName}"?`)) return;
+    let tiempoSegundos = cronoElapsedTime / 1000;
+    if (tiempoSegundos === 0) return alert("⚠️ El tiempo está en ceros.");
 
-    // Cambiamos el botón a estado de carga
-    const btn = document.querySelector('button[onclick="guardarTiempoFirebase()"]');
-    const oldText = btn.innerHTML;
-    btn.innerHTML = "⏳ GUARDANDO...";
-    btn.disabled = true;
+    let tiempoFormateado = document.getElementById('display-crono').textContent;
 
-    try {
-        // Guardamos el tiempo final en una colección dedicada a las carreras
-        await addDoc(collection(db, "tiempos_carreras"), {
-            categoria: currentCategory, // Ej: "Seguimiento de línea"
-            robot: robotName,
-            tiempo_segundos: tiempoEnSegundos,
-            faltas: cronoFaltas,
-            tiempo_base_ms: cronoElapsedTime,
-            juez: currentUser,
-            timestamp: Date.now()
-        });
+    abrirModalConfirmar(`¿Enviar tiempo final de ${tiempoFormateado} para el equipo "${robotName}"?`, async () => {
+        try {
+            await addDoc(collection(db, "tiempos_carreras"), {
+                categoria: currentCategory, 
+                robot: robotName,
+                tiempo_segundos: tiempoSegundos, 
+                tiempo_base_ms: cronoElapsedTime,
+                juez: currentUser, 
+                timestamp: Date.now()
+            });
 
-        alert(`✅ Tiempo guardado exitosamente.`);
-        
-        // Limpiamos y regresamos a la sala de espera
-        window.resetCrono();
-        document.getElementById('juez-modo-espera').classList.remove('hidden');
-        document.getElementById('juez-modo-carrera').classList.add('hidden');
+            // 🔥 LE AVISAMOS A LA ARENA DEL ADMIN QUE YA TERMINAMOS
+            await updateDoc(doc(db, "arenas", obtenerTagExacto(currentCategory)), { estado: 'inactivo' });
 
-    } catch (error) {
-        console.error("🔥 Error guardando tiempo:", error);
-        alert("Error al guardar el tiempo en la base de datos.");
-    } finally {
-        btn.innerHTML = oldText;
-        btn.disabled = false;
-    }
+            window.resetCrono(); 
+            mostrarExitoTemporal(); 
+        } catch (e) { console.error(e); }
+    });
 };

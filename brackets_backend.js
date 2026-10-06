@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, getDocs, query, where, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, getDocs, query, where, writeBatch, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDO5C61Kx2E1p4zJ8YdRGaPCD7UYro0dwc",
@@ -146,21 +146,19 @@ function cargarDatosDesdeServidor() {
             const c = docSnap.data();
             docentesMap[c.nombre] = c.docente || c.facultad || 'Sin Asesor'; 
             
-            // Atrapamos cualquier variación (mayúsculas, acentos, vieja versión)
+            // Atrapamos cualquier variación
             let textoFiltro = (c.categoria_tag || c.categoria_original || c.categoria || '').toLowerCase();
             let tagReal = '';
             
             if (textoFiltro.includes('peque')) tagReal = 'pequenos';
             else if (textoFiltro.includes('median')) tagReal = 'mediano';
             else if (textoFiltro.includes('grand')) tagReal = 'grandes';
+            else if (textoFiltro.includes('segui') || textoFiltro.includes('línea') || textoFiltro.includes('linea')) tagReal = 'seguimiento';
+            else if (textoFiltro.includes('evasor') || textoFiltro.includes('obst')) tagReal = 'evasor';
 
-            if (['pequenos','mediano','grandes'].includes(tagReal)) {
+            if (['pequenos','mediano','grandes','seguimiento','evasor'].includes(tagReal)) {
+                if (!tournamentData[tagReal]) tournamentData[tagReal] = { participants: [], puntosTotales: {} };
                 tournamentData[tagReal].participants.push(c.nombre);
-                
-                // 🧠 MAGIA DE PUNTOS: Inicializamos el cajón de puntos si no existe, y guardamos lo que viene de Firebase
-                if (!tournamentData[tagReal].puntosTotales) tournamentData[tagReal].puntosTotales = {};
-                
-                // Atrapamos los puntos sin importar si en tu Firebase la columna se llama "puntos", "puntaje" o "score"
                 tournamentData[tagReal].puntosTotales[c.nombre] = Number(c.puntos || c.puntaje || c.score || 0);
             }
         });
@@ -430,6 +428,9 @@ function updateLaterRoundsCascading(data) {
 }
 
 window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
+    // 🔥 MODO SOLO LECTURA: El Súper Admin no puede tocar los brackets
+    if (sessionStorage.getItem('juez_superadmin') === 'true') return;
+
     const data = tournamentData[cat];
     let match;
 
@@ -489,8 +490,16 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
 // RENDERIZADO VISUAL CON SUB-MENÚ DE FASES
 // =====================================================================
 
-window.renderTournament = function renderTournament(cat, subView = 'menu') {
-    currentSubView = subView; // 🔥 GUARDAMOS LA PANTALLA ACTUAL
+window.renderTournament = function renderTournament(cat, subView = null) {
+    // 🔥 MAGIA ANTI-AMNESIA: Si no me mandan un subView, reviso si había guardado uno antes.
+    if (!subView) {
+        subView = sessionStorage.getItem(`fime_vista_${cat}`) || 'menu';
+    }
+    
+    // Si me pasaron uno nuevo, lo guardo para que no se me olvide
+    sessionStorage.setItem(`fime_vista_${cat}`, subView);
+    currentSubView = subView; 
+
     const container = document.getElementById('tournament-' + cat);
     const data = tournamentData[cat];
     if (!container) return;
@@ -799,14 +808,19 @@ function renderMatchBox(cat, phase, matchIdx, match, subView) {
         `;
     };
 
+    // Detectamos si estamos en Modo Arena O si es Súper Admin
+    const isArena = !!document.fullscreenElement;
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    const ocultarRayito = isArena || isSuperAdmin;
+
     return `
         <div class="match-container">
             <div class="match-card hover:shadow-lg transition-shadow overflow-hidden flex flex-col">
                 ${renderRow(match.player1, match.player2 === null, match.player1 === null)}
                 ${renderRow(match.player2, match.player1 === null, match.player2 === null)}
                 
-                <!-- BOTÓN PARA MANDAR AL PANEL -->
-                <div onclick="prepararPanel('${cat}', '${match.player1}', '${match.player2}')" class="w-full bg-gray-50 hover:bg-emerald-100 text-center cursor-pointer border-t border-gray-100 transition-colors">
+                <!-- BOTÓN PARA MANDAR AL PANEL (Oculto en Modo Arena y para Súper Admin) -->
+                <div onclick="prepararPanel('${cat}', '${match.player1}', '${match.player2}')" class="${ocultarRayito ? 'hidden' : 'w-full bg-gray-50 hover:bg-emerald-100 text-center cursor-pointer border-t border-gray-100 transition-colors'}">
                     <span class="text-[10px] font-bold text-gray-400 hover:text-emerald-700 uppercase tracking-widest block py-2 flex items-center justify-center gap-1">
                         ⚡ Cargar en Panel
                     </span>
@@ -815,7 +829,6 @@ function renderMatchBox(cat, phase, matchIdx, match, subView) {
         </div>
     `;
 }
-
 // =====================================================================
 // 🔥 NÚCLEO DE SINCRONIZACIÓN UNIVERSAL (TODOS VEN LO MISMO)
 // =====================================================================
@@ -881,70 +894,130 @@ window.resetTournament = async function(cat) {
     }
 };
 
-// =====================================================================
-// MÓDULO DE TIEMPOS (CARRERAS) - INTACTO
-// =====================================================================
-function renderTimeTable(cat) {
+window.tiempoCarreras = { seguimiento: {}, evasor: {} };
+// Escuchador en vivo de los tiempos guardados
+onSnapshot(collection(db, "tiempos_carreras"), (snapCarreras) => {
+    
+    // 🔥 MAGIA ANTI-FANTASMAS: Vaciamos la memoria antes de leer la base de datos
+    window.tiempoCarreras = { seguimiento: {}, evasor: {} };
+
+    snapCarreras.forEach(docT => {
+        const t = docT.data();
+        let catT = (t.categoria || '').toLowerCase().includes('seg') ? 'seguimiento' : 'evasor';
+        if (!window.tiempoCarreras[catT][t.robot] || t.tiempo_segundos < window.tiempoCarreras[catT][t.robot]) {
+            window.tiempoCarreras[catT][t.robot] = t.tiempo_segundos;
+        }
+    });
+    const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+    if (['seguimiento', 'evasor'].includes(activeView)) {
+        renderTimeTable(activeView);
+    }
+});
+
+window.renderTimeTable = function(cat) {
     const container = document.getElementById('time-' + cat);
-    const sorted = [...timeData[cat]].sort((a,b) => a.timeSeconds - b.timeSeconds);
-    const equipos = timeParticipants[cat] || [];
+    const equipos = tournamentData[cat] && tournamentData[cat].participants ? tournamentData[cat].participants : [];
     
     if (equipos.length === 0) {
-        container.innerHTML = `<div class="text-center p-12 bg-white rounded-3xl border border-gray-200 shadow-sm w-full max-w-4xl mx-auto"><span class="text-6xl block mb-4">⏱️</span><h3 class="text-2xl font-black text-gray-400 uppercase tracking-widest">Pista Vacía</h3><p class="text-gray-400 font-bold mt-2">Aún no hay robots registrados en esta categoría.</p></div>`;
+        container.innerHTML = `<div class="text-center p-12 bg-white rounded-3xl border border-gray-200 shadow-sm w-full max-w-4xl mx-auto"><span class="text-6xl block mb-4">🏁</span><h3 class="text-2xl font-black text-gray-400 uppercase tracking-widest">Pista Vacía</h3><p class="text-gray-400 font-bold mt-2">Sube tu padrón desde el Panel Admin.</p></div>`;
         return;
     }
 
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100 mb-8 w-full max-w-4xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-center">
-            <select id="time-select-${cat}" class="bg-gray-50 border-2 border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-emerald-500 focus:border-emerald-500 block w-full md:w-auto p-3 outline-none transition-colors">
-                <option value="">-- Seleccionar Robot --</option>
-                ${equipos.map(e=>`<option>${esc(e)}</option>`).join('')}
-            </select>
-            <div class="flex gap-2">
-                <input id="time-min-${cat}" placeholder="Min" type="number" value="0" min="0" class="w-20 bg-gray-50 border-2 border-gray-200 text-center text-gray-800 text-sm font-bold rounded-xl p-3 focus:border-emerald-500 outline-none transition-colors">
-                <input id="time-seg-${cat}" placeholder="Seg" type="number" value="0" min="0" max="59" class="w-20 bg-gray-50 border-2 border-gray-200 text-center text-gray-800 text-sm font-bold rounded-xl p-3 focus:border-emerald-500 outline-none transition-colors">
-                <input id="time-ms-${cat}" placeholder="ms" type="number" value="0" min="0" max="999" class="w-24 bg-gray-50 border-2 border-gray-200 text-center text-gray-800 text-sm font-bold rounded-xl p-3 focus:border-emerald-500 outline-none transition-colors">
-            </div>
-            <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-wider text-xs w-full md:w-auto" onclick="addTime('${cat}')">
-                ⏱️ Registrar
-            </button>
-        </div>
+    let resultados = equipos.map(eq => {
+        return { name: eq, time: window.tiempoCarreras[cat] && window.tiempoCarreras[cat][eq] ? window.tiempoCarreras[cat][eq] : null };
+    });
 
-        <div class="overflow-x-auto bg-white rounded-2xl shadow-md border border-gray-100 w-full max-w-5xl mx-auto">
-            <table class="w-full text-sm text-left text-gray-600">
-                <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
-                    <tr>
-                        <th scope="col" class="px-6 py-4 text-center font-extrabold tracking-wider">Posición</th>
-                        <th scope="col" class="px-6 py-4 font-extrabold tracking-wider">Competidor & Docente</th>
-                        <th scope="col" class="px-6 py-4 text-center font-extrabold tracking-wider">Marca Oficial</th>
-                        <th scope="col" class="px-6 py-4 text-center font-extrabold tracking-wider">Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                ${sorted.map((e,i)=>{
-                    let medal = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-bold border border-gray-300">${i+1}</span>`; 
-                    if(i===0) medal=`<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 font-black border-2 border-yellow-400 shadow-sm">1</span>`; 
-                    if(i===1) medal=`<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-black border-2 border-slate-300 shadow-sm">2</span>`; 
-                    if(i===2) medal=`<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-50 text-orange-800 font-black border-2 border-orange-300 shadow-sm">3</span>`;
-                    
-                    return `<tr class="bg-white border-b hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-center">${medal}</td>
-                        <td class="px-6 py-4">
-                            <div class="font-black text-gray-900 text-base">${esc(e.name)}</div>
-                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">${esc(docentesMap[e.name] || '')}</div>
+    // Ordenar de Menor tiempo a Mayor
+    resultados.sort((a, b) => {
+        if (a.time === null && b.time === null) return 0;
+        if (a.time === null) return 1;
+        if (b.time === null) return -1;
+        return a.time - b.time;
+    });
+
+    let titulo = cat === 'seguimiento' ? '🏎️ SEGUIMIENTO DE LÍNEA' : '🧭 EVASOR DE OBSTÁCULOS';
+    const isArena = !!document.fullscreenElement;
+    
+    // 🔥 CORRECCIÓN: Movimos isSuperAdmin aquí arriba para que la tabla la pueda leer sin crashear.
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+
+    let html = `
+    <!-- BOTÓN MODO ARENA NORMAL -->
+    <div id="arena-header" class="mb-6 w-full flex justify-center bg-white p-3 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
+        <button onclick="activarModoArena()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-6 py-3.5 rounded-xl font-extrabold shadow-md transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+            🖥️ Modo Arena
+        </button>
+    </div>
+
+    <!-- CONTENEDOR DE LA TABLA (CENTRO ABSOLUTO Y SCROLL) -->
+    <div id="arena-workspace" class="w-full mx-auto animate-fade-in ${isArena ? 'fixed top-0 left-0 w-screen h-screen bg-gray-50 z-[9999] p-8 overflow-y-auto flex flex-col items-center justify-start' : 'max-w-4xl mt-4 mb-8'}">
+        
+        <div class="w-full max-w-4xl flex-shrink-0 relative">
+            <div class="text-center mb-8 pt-4">
+                <h2 class="text-3xl md:text-4xl font-black text-emerald-800 uppercase tracking-tighter">${titulo}</h2>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden mb-6">
+                <table class="w-full text-left">
+                    <thead class="bg-emerald-800 text-white">
+                        <tr>
+                            <th class="py-5 px-8 font-black uppercase tracking-widest text-[13px] w-2/3">Equipos</th>
+                            <th class="py-5 px-8 font-black uppercase tracking-widest text-[13px] text-right w-1/3">Tiempos</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">`;
+
+    resultados.forEach((r, idx) => {
+        let timeText = '--:--:--';
+        if (r.time) {
+            let m = Math.floor(r.time / 60).toString().padStart(2, '0');
+            let s = Math.floor(r.time % 60).toString().padStart(2, '0');
+            let ms = Math.floor((r.time % 1) * 100).toString().padStart(2, '0');
+            timeText = `${m}:${s}:${ms}`;
+        }
+        
+        let medal = r.time ? (idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `<span class="text-gray-400 font-black mr-2">${idx+1}.</span> `) : '';
+
+        html += `
+                    <tr class="hover:bg-emerald-50 transition-colors">
+                        <td class="py-5 px-8 flex items-center justify-between">
+                            <div class="font-extrabold text-gray-800 uppercase text-lg">${medal}${esc(r.name)}</div>
+                            <!-- EL RAYITO (SE OCULTA EN MODO ARENA Y PARA SÚPER ADMIN) -->
+                            <button onclick="prepararPanel('${cat}', '${escAttr(r.name)}', '')" class="${(isArena || isSuperAdmin) ? 'hidden' : 'inline-flex'} items-center justify-center bg-gray-100 hover:bg-emerald-100 text-gray-500 hover:text-emerald-700 p-2 rounded-lg transition-colors shadow-sm ml-4" title="Cargar en Panel">⚡</button>
                         </td>
-                        <td class="px-6 py-4 text-center font-mono font-extrabold text-lg text-emerald-700">${fmt(e.timeSeconds)}</td>
-                        <td class="px-6 py-4 text-center">
-                            <button class="text-red-500 hover:text-red-700 hover:scale-125 transition-transform" onclick="deleteTime('${cat}',${e.id})">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
+                        <td class="py-5 px-8 text-right">
+                            <span class="font-mono font-black text-2xl ${r.time ? 'text-emerald-600' : 'text-gray-300'}">${timeText}</span>
                         </td>
                     </tr>`;
-                }).join('')}
+    });
+
+    html += `
                 </tbody>
             </table>
         </div>`;
-}
+
+    // 🔥 BOTÓN NUCLEAR: Solo para Súper Admin y oculto en Modo Arena
+    if (isSuperAdmin && !isArena) {
+        html += `
+        <div class="mt-8 border-t-2 border-red-200 pt-6 text-center">
+            <button onclick="nuclearResetCarreras('${cat}')" class="bg-red-600 hover:bg-red-800 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-transform active:scale-95 text-xs uppercase tracking-widest flex items-center justify-center gap-2 mx-auto">
+                ☢️ Reiniciar Tiempos de Categoría
+            </button>
+            <p class="text-[10px] text-red-500 font-bold mt-2 uppercase tracking-widest">Peligro: Borra todos los tiempos y devuelve puntos a 0</p>
+        </div>`;
+    }
+
+    html += `
+        <!-- BOTÓN SALIR MODO ARENA (FIJO ABAJO SI ES ARENA) -->
+        <button onclick="salirModoArena()" class="${isArena ? 'flex' : 'hidden'} mt-2 mb-10 bg-red-500 hover:bg-red-600 text-white w-full py-4 rounded-xl font-extrabold text-sm uppercase tracking-widest shadow-md items-center justify-center gap-2 active:scale-95 transition-transform">
+            ❌ Salir de Pantalla Completa
+        </button>
+        
+    </div>
+</div>`;
+
+    container.innerHTML = html;
+};
 
 window.addTime = (cat) => {
     const name = document.getElementById('time-select-' + cat).value; if (!name) return;
@@ -968,11 +1041,67 @@ function fmt(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); cons
 
 window.exportAllToExcel = () => {
     const wb = XLSX.utils.book_new();
-    const rows = [['Nombre del equipo','Categoria']];
-    ['pequenos','mediano','grandes'].forEach(c => tournamentData[c].participants.forEach(p => rows.push([p,c])));
-    ['seguimiento','evasor'].forEach(c => timeParticipants[c].forEach(p => rows.push([p,c])));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Respaldo_FIME');
-    XLSX.writeFile(wb, 'respaldo_guerra_robots.xlsx');
+
+    // 1. PROCESAR CATEGORÍAS DE COMBATE (Por Puntos)
+    const categoriasCombate = [
+        { id: 'pequenos', nombre: 'Pequeños' },
+        { id: 'mediano', nombre: 'Mediano' },
+        { id: 'grandes', nombre: 'Grandes' }
+    ];
+
+    categoriasCombate.forEach(cat => {
+        let rows = [['Posición', 'Robot / Equipo', 'Puntos Totales']];
+        const data = tournamentData[cat.id];
+
+        // Si la categoría tiene equipos, los procesamos
+        if (data && data.participants && data.participants.length > 0) {
+            let scores = [];
+            data.participants.forEach(p => {
+                scores.push({ name: p, score: (data.puntosTotales && data.puntosTotales[p]) ? data.puntosTotales[p] : 0 });
+            });
+            scores.sort((a, b) => b.score - a.score);
+            scores.forEach((r, idx) => {
+                rows.push([r.score > 0 ? (idx + 1) : '-', r.name, r.score]);
+            });
+        } else {
+            // Si está vacía, ponemos una fila de aviso para que la tabla no esté en blanco
+            rows.push(['-', 'Aún no hay equipos registrados', '-']);
+        }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cat.nombre);
+    });
+
+    // 2. PROCESAR CATEGORÍAS DE CARRERA (Por Tiempo)
+    const categoriasCarrera = [
+        { id: 'seguimiento', nombre: 'Seguimiento' },
+        { id: 'evasor', nombre: 'Evasor' }
+    ];
+
+    categoriasCarrera.forEach(cat => {
+        let rows = [['Posición', 'Robot / Equipo', 'Tiempo Oficial (Segundos)']];
+        const data = tournamentData[cat.id];
+
+        if (data && data.participants && data.participants.length > 0) {
+            let tiempos = [];
+            data.participants.forEach(p => {
+                let t = (window.tiempoCarreras[cat.id] && window.tiempoCarreras[cat.id][p]) ? window.tiempoCarreras[cat.id][p] : null;
+                tiempos.push({ name: p, time: t });
+            });
+            tiempos.sort((a, b) => {
+                if (a.time === null && b.time === null) return 0;
+                if (a.time === null) return 1;
+                if (b.time === null) return -1;
+                return a.time - b.time;
+            });
+            tiempos.forEach((r, idx) => {
+                rows.push([r.time ? (idx + 1) : '-', r.name, r.time ? r.time : "Sin tiempo"]);
+            });
+        } else {
+            rows.push(['-', 'Aún no hay equipos registrados', '-']);
+        }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cat.nombre);
+    });
+
+    XLSX.writeFile(wb, 'Resultados_Guerra_Robots_FIME.xlsx');
 };
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -992,34 +1121,44 @@ window.salirModoArena = function() {
 };
 
 
-// 🚨 VIGILANTE DE EVENTOS: Detecta si entramos o salimos
+// 🚨 VIGILANTE DE EVENTOS: Detecta si entramos o salimos de pantalla completa
 document.addEventListener('fullscreenchange', () => {
     const isArena = !!document.fullscreenElement;
     const mainHeader = document.querySelector('header');
-    const workspace = document.getElementById('arena-workspace');
-    const header = document.getElementById('arena-header');
-    const scoreboard = document.getElementById('arena-scoreboard');
+    const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
     
+    // 1. Ocultar o Mostrar el Encabezado Principal de FIME
     if (isArena) {
-        // Entrando al Modo Arena
         if (mainHeader) mainHeader.style.display = 'none';
-        if (header) header.style.display = 'none';
-        if (scoreboard) { scoreboard.classList.remove('hidden'); scoreboard.classList.add('flex'); }
-        if (workspace) {
-            // MAGIA: Rompe los límites de la web y fuerza el 100% del monitor real
-            workspace.classList.add('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
-            workspace.classList.remove('h-[85vh]');
-        }
     } else {
-        // Saliendo del Modo Arena
         if (mainHeader) mainHeader.style.display = '';
-        if (header) header.style.display = ''; 
-        if (scoreboard) { scoreboard.classList.add('hidden'); scoreboard.classList.remove('flex'); }
-        if (workspace) {
-            // Regresa a la normalidad
-            workspace.classList.remove('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
-            workspace.classList.add('h-[85vh]');
+    }
+
+    // 2. MODO COMBATES (Brackets): Usamos tu lógica manual para no perder la posición del Scroll
+    if (['pequenos', 'mediano', 'grandes'].includes(activeView)) {
+        const workspace = document.getElementById('arena-workspace');
+        const header = document.getElementById('arena-header');
+        const scoreboard = document.getElementById('arena-scoreboard');
+        
+        if (isArena) {
+            if (header) header.style.display = 'none';
+            if (scoreboard) { scoreboard.classList.remove('hidden'); scoreboard.classList.add('flex'); }
+            if (workspace) {
+                workspace.classList.add('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
+                workspace.classList.remove('h-[85vh]');
+            }
+        } else {
+            if (header) header.style.display = ''; 
+            if (scoreboard) { scoreboard.classList.add('hidden'); scoreboard.classList.remove('flex'); }
+            if (workspace) {
+                workspace.classList.remove('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
+                workspace.classList.add('h-[85vh]');
+            }
         }
+    } 
+    // 3. MODO CARRERAS (Tiempos): Redibujamos porque el CSS de pantalla completa ya viene inyectado
+    else if (['seguimiento', 'evasor'].includes(activeView)) {
+        renderTimeTable(activeView);
     }
 });
 
@@ -1098,16 +1237,337 @@ window.abrirModalPuntajes = function(cat) {
 };
 
 // =====================================================================
-// TRANSMISOR DE RADIO PARA EL PANEL MAESTRO
+// CONEXIÓN DIRECTA CON EL PANEL DE CONTROL (LOBBY)
 // =====================================================================
-const canalPanel = new BroadcastChannel('fime_torneo_canal');
-
 window.prepararPanel = function(cat, r1, r2) {
-    if(!r1 || !r2 || r1==='null' || r2==='null' || r1==='EMPTY' || r2==='EMPTY') {
-        alert("⚠️ Necesitas que ambos robots estén definidos en esta llave.");
-        return;
+    const isCarrera = cat.toLowerCase().includes('segui') || cat.toLowerCase().includes('evas');
+    
+    if (isCarrera) {
+        if(!r1 || r1==='null' || r1==='EMPTY') return alert("⚠️ Necesitas que el robot esté definido.");
+        r2 = ""; 
+    } else {
+        if(!r1 || !r2 || r1==='null' || r2==='null' || r1==='EMPTY' || r2==='EMPTY') {
+            return alert("⚠️ Necesitas que ambos robots estén definidos en esta llave.");
+        }
     }
     
-    canalPanel.postMessage({ accion: 'cargar_pelea', cat: cat, r1: r1, r2: r2 });
-    console.log(`📡 Señal enviada al panel: ${r1} VS ${r2}`);
+    // 1. Llenamos los selectores del Lobby directamente (sin señales de radio)
+    const selectR1 = document.getElementById(`sa-r1-${cat}`);
+    const selectR2 = document.getElementById(`sa-r2-${cat}`);
+    
+    if (selectR1) selectR1.value = r1;
+    if (selectR2 && !isCarrera) selectR2.value = r2;
+    
+    // 2. Lo regresamos automáticamente al menú principal (Lobby)
+    if (typeof window.goToMenu === 'function') {
+        window.goToMenu();
+    }
+    
+    // 3. Efecto visual (hace palpitar el panel para que el Admin sepa dónde dar clic)
+    setTimeout(() => {
+        const panel = selectR1?.closest('.rounded-xl');
+        if (panel) {
+            panel.classList.add('ring-4', 'ring-emerald-400', 'scale-[1.02]');
+            setTimeout(() => panel.classList.remove('ring-4', 'ring-emerald-400', 'scale-[1.02]'), 400);
+        }
+    }, 100);
 };
+// =====================================================================
+// 👁️ OJO DE DIOS Y BOTÓN NUCLEAR (SÚPER ADMIN)
+// =====================================================================
+
+// 1. Botón Nuclear para Carreras
+window.nuclearResetCarreras = async function(cat) {
+    if(!confirm(`☢️ ¡PELIGRO! ☢️\n¿Estás absolutamente seguro de querer borrar TODOS los tiempos de "${cat.toUpperCase()}"?\n\nLos puntos de estos robots regresarán a 0. Esta acción NO se puede deshacer.`)) return;
+
+    try {
+        const qTiempos = await getDocs(collection(db, "tiempos_carreras"));
+        const batch = writeBatch(db);
+        let count = 0;
+        let robotsAfectados = [];
+
+        qTiempos.forEach(d => {
+            let docCat = d.data().categoria || '';
+            // Si coincide la categoría (ej. "segui" con "Seguimiento")
+            if(docCat.toLowerCase().includes(cat.substring(0,4).toLowerCase())) { 
+                batch.delete(d.ref);
+                robotsAfectados.push(d.data().robot);
+                count++;
+            }
+        });
+
+        if (robotsAfectados.length > 0) {
+            const compSnap = await getDocs(collection(db, "competidores"));
+            compSnap.forEach(c => {
+                if(robotsAfectados.includes(c.data().nombre)) {
+                    batch.update(c.ref, { score: 0 });
+                }
+            });
+        }
+
+        await batch.commit();
+        
+        // 🔥 FORZAMOS LA LIMPIEZA INMEDIATA EN PANTALLA SIN F5
+        const catClean = cat.toLowerCase().includes('seg') ? 'seguimiento' : 'evasor';
+        window.tiempoCarreras[catClean] = {};
+        if (typeof window.renderTimeTable === 'function') {
+            window.renderTimeTable(catClean);
+        }
+
+        alert(`☢️ ¡BOOM! ${count} tiempos eliminados. Pista limpia.`);
+    } catch(e) { console.error(e); alert("Error en el borrado nuclear."); }
+};
+
+// 2. Inyección de Monitores en el Lobby (Para Súper Admin y Admins Normales)
+function inyectarOjoDeDios() {
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    const miCatAdmin = sessionStorage.getItem('juez_categoria');
+    
+    // Función para sacar el "tag" corto de la categoría del Admin normal
+    function getMiTag() {
+        if(!miCatAdmin) return '';
+        const b = miCatAdmin.toLowerCase();
+        if(b.includes('peque')) return 'pequenos';
+        if(b.includes('media')) return 'mediano';
+        if(b.includes('grand')) return 'grandes';
+        if(b.includes('segui')) return 'seguimiento';
+        if(b.includes('evas')) return 'evasor';
+        return '';
+    }
+    const miTag = getMiTag();
+
+    const categorias = ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'];
+    
+    categorias.forEach(cat => {
+        // Si no eres Súper Admin, y esta categoría NO es la tuya, nos la saltamos.
+        if (!isSuperAdmin && cat !== miTag) return;
+
+        const card = document.querySelector(`[onclick="openCategory('${cat}')"]`);
+        if(!card) return;
+
+        // 🔥 Candado de ancho para que coincida perfecto con la tarjeta
+        const wrapper = document.createElement('div');
+        wrapper.className = "flex flex-col gap-3 relative w-full max-w-[340px] mx-auto sm:mx-0";
+        card.parentNode.insertBefore(wrapper, card);
+        wrapper.appendChild(card);
+        card.classList.add('w-full');
+
+        const isCarrera = cat === 'seguimiento' || cat === 'evasor';
+
+        const panel = document.createElement('div');
+        
+        // 🔥 Colores FIME para Admin vs Ámbar para Súper Admin
+        const panelEstilo = isSuperAdmin 
+            ? "bg-amber-50 border-2 border-amber-200" 
+            : "bg-emerald-50 border-2 border-emerald-600"; 
+            
+        panel.className = `${panelEstilo} rounded-xl p-3 shadow-md cursor-default z-10 transition-all animate-fade-in w-full`;
+        panel.onclick = (e) => e.stopPropagation(); 
+
+        const tituloPanel = isSuperAdmin ? `👁️ Ojo de Dios: ${cat}` : `🥊 Control de Arena`;
+        const colorTitulo = isSuperAdmin ? "text-amber-800" : "text-emerald-800";
+
+        panel.innerHTML = `
+            <h4 class="text-[10px] font-black uppercase tracking-wider ${colorTitulo} mb-2 flex items-center gap-1 justify-center">
+                ${tituloPanel}
+            </h4>
+            
+            <div class="flex gap-2 mb-3">
+                <select id="sa-r1-${cat}" class="${isCarrera ? 'w-full' : 'w-1/2'} p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm focus:border-emerald-500 focus:outline-none transition-all text-[10px]">
+                    <option value="">-- ESPERANDO R1 --</option>
+                </select>
+                ${isCarrera ? '' : `
+                <span class="text-xs font-black text-red-500 self-center transition-all">VS</span>
+                <select id="sa-r2-${cat}" class="w-1/2 p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm focus:border-emerald-500 focus:outline-none transition-all text-[10px]">
+                    <option value="">-- ESPERANDO R2 --</option>
+                </select>`}
+            </div>
+
+            <div class="flex gap-2">
+                <button id="sa-btn-iniciar-${cat}" onclick="saAccionArena('${cat}', 'iniciar')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">Iniciar</button>
+                <button id="sa-btn-ko-${cat}" onclick="saAccionArena('${cat}', 'ko')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">${isCarrera ? '🏁 Fin Carrera' : '🥊 K.O.'}</button>
+                <button onclick="saAccionArena('${cat}', 'limpiar')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
+            </div>
+        `;
+        wrapper.appendChild(panel);
+
+        // 🔥 RECUPERADO: Radar de la Arena para cambiar el botón a "En Curso"
+        onSnapshot(doc(db, "arenas", cat), (docSnap) => {
+            if(!docSnap.exists()) return;
+            const data = docSnap.data();
+            const selR1 = document.getElementById(`sa-r1-${cat}`);
+            const selR2 = document.getElementById(`sa-r2-${cat}`);
+            const btnIniciar = document.getElementById(`sa-btn-iniciar-${cat}`);
+            
+            if(!selR1 || !btnIniciar) return;
+
+            if(data.robot1) selR1.value = data.robot1;
+            if(selR2 && data.robot2) selR2.value = data.robot2;
+            
+            if (data.estado === 'peleando') {
+                btnIniciar.className = "flex-1 bg-amber-500 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md cursor-not-allowed";
+                btnIniciar.innerHTML = "⏳ Combate en Curso...";
+                btnIniciar.disabled = true;
+            } else {
+                btnIniciar.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
+                btnIniciar.innerHTML = "Iniciar";
+                btnIniciar.disabled = false;
+                if(data.estado === 'inactivo') {
+                    selR1.value = '';
+                    if(selR2) selR2.value = '';
+                    
+                    // 🔥 MAGIA: MARCAR GANADOR EN BRACKETS AUTOMÁTICAMENTE
+                    if (data.ganador_automatico) {
+                        const tData = tournamentData[cat];
+                        if (tData) {
+                            const marcarLlave = (fase, arr) => {
+                                if(!arr) return false;
+                                for(let i=0; i<arr.length; i++) {
+                                    let m = arr[i];
+                                    // Comprobamos si la pelea es de estos dos robots
+                                    if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
+                                        // Solo lo marcamos si la llave aún no tiene ganador
+                                        if (m.winner === null) {
+                                            window.selectWinner(cat, fase, i, data.ganador_automatico, currentSubView);
+                                            return true;
+                                        }
+                                    }
+                                }
+                                return false;
+                            };
+
+                            let encontrado = false;
+                            if(!encontrado) encontrado = marcarLlave('round1', tData.round1Matches);
+                            if(!encontrado) encontrado = marcarLlave('repechage', tData.repechageMatches);
+                            if(!encontrado && tData.laterRounds) {
+                                for(let r=0; r<tData.laterRounds.length; r++) {
+                                    for(let i=0; i<tData.laterRounds[r].length; i++) {
+                                        let m = tData.laterRounds[r][i];
+                                        if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
+                                            if (m.winner === null) {
+                                                window.selectWinner(cat, 'laterRounds', [r, i], data.ganador_automatico, currentSubView);
+                                                encontrado = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Borramos la señal de Firebase para que no se cicle
+                        updateDoc(doc(db, "arenas", cat), { ganador_automatico: null });
+                    }
+                }
+            }
+        });
+    }); // <-- Aquí cierra correctamente el ciclo de las categorías
+
+    // Rellenar las listas de robots en tiempo real
+    onSnapshot(collection(db, "competidores"), (snap) => {
+        let comp = [];
+        snap.forEach(doc => comp.push(doc.data()));
+        
+        categorias.forEach(cat => {
+            const selR1 = document.getElementById(`sa-r1-${cat}`);
+            const selR2 = document.getElementById(`sa-r2-${cat}`);
+            if(!selR1) return;
+            
+            const currentR1 = selR1.value;
+            const currentR2 = selR2 ? selR2.value : '';
+            
+            let opts = `<option value="">-- ESPERANDO --</option>`;
+            comp.filter(c => {
+                let cTag = c.categoria_tag || '';
+                let cOrig = (c.categoria_original || '').toLowerCase();
+                return cTag === cat || cOrig.includes(cat.substring(0,4));
+            }).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
+                opts += `<option value="${c.nombre}">${c.nombre}</option>`;
+            });
+            
+            selR1.innerHTML = opts;
+            if(selR2) selR2.innerHTML = opts;
+            
+            selR1.value = currentR1;
+            if(selR2) selR2.value = currentR2;
+        });
+    });
+}
+
+// 3. Funciones de Control Override
+window.saAccionArena = async function(cat, accion) {
+    const arenaRef = doc(db, "arenas", cat);
+    
+    if (accion === 'limpiar') {
+        if(!confirm(`🧹 ¿Limpiar arena de ${cat.toUpperCase()}?`)) return;
+        await setDoc(arenaRef, { robot1: '', robot2: '', estado: 'inactivo' });
+    } 
+    else if (accion === 'ko') {
+        const isCarrera = cat === 'seguimiento' || cat === 'evasor';
+        if(!confirm(isCarrera ? '🏁 ¿Forzar fin de carrera?' : '🥊 ¿Declarar K.O.?')) return;
+        await updateDoc(arenaRef, { estado: 'ko' });
+    }
+    else if (accion === 'iniciar') {
+        const r1 = document.getElementById(`sa-r1-${cat}`).value;
+        const r2 = document.getElementById(`sa-r2-${cat}`) ? document.getElementById(`sa-r2-${cat}`).value : '';
+        const isCarrera = cat === 'seguimiento' || cat === 'evasor';
+        
+        if (isCarrera) {
+            if (!r1) return alert("Selecciona un robot.");
+        } else {
+            if (!r1 || !r2) return alert("Selecciona ambos robots.");
+            if (r1 === r2) return alert("Mismo robot.");
+        }
+        
+        await setDoc(arenaRef, { 
+            robot1: r1, 
+            robot2: isCarrera ? '' : r2, 
+            estado: 'peleando',
+            tiempo_inicio: Date.now() / 1000 
+        });
+    }
+};
+
+// Arrancamos los motores al cargar el script
+setTimeout(() => { inyectarOjoDeDios(); }, 500);
+
+// =====================================================================
+// 🔒 FILTRO DE LOBBY PARA ADMINS NORMALES
+// =====================================================================
+function filtrarLobbyParaAdmins() {
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    if (isSuperAdmin) return; // El Súper Admin ve todo el lobby completo
+
+    const miCat = sessionStorage.getItem('juez_categoria');
+    if (!miCat) return;
+
+    // 1. Ocultar la barra de descarga de Excel para admins normales
+    const btnExcel = document.querySelector('[onclick="exportAllToExcel()"]');
+    if (btnExcel) {
+        // Busca el contenedor blanco que envuelve al botón y lo oculta
+        const cajaExcel = btnExcel.closest('.bg-white') || btnExcel.parentElement;
+        if (cajaExcel) cajaExcel.style.display = 'none';
+    }
+
+
+    // Convertimos su categoría al formato del HTML
+    const base = miCat.toLowerCase().trim();
+    let miTag = '';
+    if (base.includes('peque')) miTag = 'pequenos';
+    else if (base.includes('media')) miTag = 'mediano';
+    else if (base.includes('grand')) miTag = 'grandes';
+    else if (base.includes('segui')) miTag = 'seguimiento';
+    else if (base.includes('evas')) miTag = 'evasor';
+
+    // Ocultamos las tarjetas que no le corresponden
+    const categorias = ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'];
+    categorias.forEach(cat => {
+        if (cat !== miTag) {
+            const card = document.querySelector(`[onclick="openCategory('${cat}')"]`);
+            if (card) {
+                card.style.display = 'none'; // Desaparece del lobby
+            }
+        }
+    });
+}
+
+// Ejecutamos el filtro un instante después de cargar la página
+setTimeout(filtrarLobbyParaAdmins, 100);
