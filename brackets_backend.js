@@ -104,7 +104,7 @@ function iniciarRadarSesionBrackets() {
         if (data.sesion_activa === false) {
             sessionStorage.clear();
             alert("🚪 Tu sesión ha sido cerrada o modificada por el sistema.");
-            window.location.href = 'portal_jueces.html';
+            window.location.href = 'index.html';
             return;
         }
 
@@ -112,7 +112,7 @@ function iniciarRadarSesionBrackets() {
         if (rolActualEnPantalla === 'admin' && data.rol !== 'admin' && data.rol !== 'superadmin') {
             sessionStorage.clear();
             alert("🥲 Ya no eres administrador. Regresando al portal de jueces...");
-            window.location.href = 'portal_jueces.html';
+            window.location.href = 'index.html';
             return;
         }
 
