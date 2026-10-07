@@ -581,19 +581,19 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 
     const isArena = !!document.fullscreenElement;
     let html = `
-    <div id="arena-header" class="mb-6 w-full grid grid-cols-3 items-center bg-white p-3 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
-        <div class="flex justify-start">
-            <button onclick="abrirModalPuntajes('${cat}')" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+    <div id="arena-header" class="mb-6 w-full flex flex-col md:flex-row flex-wrap items-center justify-center md:justify-between gap-3 bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
+        <div class="flex w-full md:w-auto justify-center md:justify-start">
+            <button onclick="abrirModalPuntajes('${cat}')" class="w-full md:w-auto justify-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
                 📊 Tabla de Puntajes
             </button>
         </div>
-        <div class="flex justify-center">
-            <button onclick="activarModoArena()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+        <div class="flex w-full md:w-auto justify-center">
+            <button onclick="activarModoArena()" class="w-full md:w-auto justify-center bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
                 🖥️ Modo Arena
             </button>
         </div>
-        <div class="flex justify-end">
-            <button onclick="renderTournament('${cat}', 'menu')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+        <div class="flex w-full md:w-auto justify-center md:justify-end">
+            <button onclick="renderTournament('${cat}', 'menu')" class="w-full md:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
                 🔙 Menú Eliminatorias
             </button>
         </div>
