@@ -198,6 +198,9 @@ function cargarDatosDesdeServidor() {
             if (btnInternalBack) {
                 btnInternalBack.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Regresar al Lobby`;
             }
+            // 🔥 El botón de "Volver al Panel" se llama "Panel Admin" para el ADMIN
+            const btnPanel = document.getElementById('btnReturnAdmin');
+            if (btnPanel) btnPanel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" /></svg> Panel Admin`;
         } else {
             // SÚPER ADMIN: Vista completa con todas las tarjetas
             // Si ya hay una pantalla abierta (ej. Las llaves), no fuerces el menú de nuevo
@@ -279,11 +282,19 @@ function showView(viewId) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-window.goToMenu = () => showView('menu');
+window.goToMenu = () => {
+    showView('menu');
+    document.getElementById('btnReturnAdmin').classList.remove('hidden');
+};
 window.openCategory = (cat) => {
     showView(cat);
-    if (['pequenos', 'mediano', 'grandes'].includes(cat)) renderTournament(cat);
-    else renderTimeTable(cat);
+    document.getElementById('btnReturnAdmin').classList.add('hidden');
+    if (['pequenos', 'mediano', 'grandes'].includes(cat)) {
+        // 🔥 FORZAMOS LA VISTA AL MENÚ SIEMPRE QUE SE ENTRE DESDE EL LOBBY
+        renderTournament(cat, 'menu');
+    } else {
+        renderTimeTable(cat);
+    }
 };
 
 // =====================================================================
@@ -346,6 +357,22 @@ function generateInitialMatches(cat) {
     guardarBracketFirebase(cat);
 }
 
+// 🔥 NUEVO: POP-UP DE CELEBRACIÓN FASE 1
+window.lanzarPopUpFase1 = function() {
+    const pop = document.createElement('div');
+    pop.className = "fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all";
+    pop.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in modal-content">
+            <div class="text-6xl mb-4 animate-bounce">🎉</div>
+            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
+            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
+            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-gray-50 py-2 rounded-lg border border-gray-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
+        </div>
+    `;
+    document.body.appendChild(pop);
+    setTimeout(() => { pop.remove(); }, 10000); // Se quita solito en 10 segundos
+};
+
 function checkPhase1Completion(data) {
     const r1Done = data.round1Matches.every(m => m.winner !== null);
     if (!r1Done) return; 
@@ -358,13 +385,14 @@ function checkPhase1Completion(data) {
 
     const repDone = data.repechageMatches.every(m => m.winner !== null);
 
-    if (r1Done && repDone && data.laterRounds.length === 0) {
+    if (r1Done && repDone && (!data.laterRounds || data.laterRounds.length === 0)) {
         buildPhase2Bracket(data);
+        window.lanzarPopUpFase1(); // 🔥 DISPARAMOS LA CELEBRACIÓN
     }
 }
 
+
 function buildPhase2Bracket(data) {
-    // 🔥 CANDADO ANTI-RANDOM: Si ya hay llaves de eliminatoria creadas, no las revuelvas
     if (data.laterRounds && data.laterRounds.length > 0) return;
     
     let allWinners = [];
@@ -377,24 +405,24 @@ function buildPhase2Bracket(data) {
     while (allWinners.length < bracketSize) {
         allWinners.push(null); 
     }
-    
     allWinners.sort(() => Math.random() - 0.5); 
 
     let currentRound = [];
     for (let i = 0; i < bracketSize; i += 2) {
         currentRound.push({ player1: allWinners[i], player2: allWinners[i+1], winner: null, isBye: (!allWinners[i] || !allWinners[i+1]) });
     }
-    data.laterRounds.push(currentRound);
+    // 🔥 CAMBIO CLAVE: Lo metemos en un objeto "matches"
+    data.laterRounds.push({ matches: currentRound });
 
     let prevMatchCount = currentRound.length;
     while(prevMatchCount > 1) {
         prevMatchCount = prevMatchCount / 2;
         let emptyRound = [];
         for(let i=0; i<prevMatchCount; i++) emptyRound.push({ player1: null, player2: null, winner: null });
-        data.laterRounds.push(emptyRound);
+        data.laterRounds.push({ matches: emptyRound });
     }
 
-    data.laterRounds[0].forEach(m => {
+    data.laterRounds[0].matches.forEach(m => {
         if (m.player1 && !m.player2) { m.winner = m.player1; m.isBye = true; }
         if (m.player2 && !m.player1) { m.winner = m.player2; m.isBye = true; }
     });
@@ -404,9 +432,9 @@ function buildPhase2Bracket(data) {
 
 function updateLaterRoundsCascading(data) {
     for (let r = 0; r < data.laterRounds.length; r++) {
-        const currentRound = data.laterRounds[r];
+        const currentRound = data.laterRounds[r].matches;
         if (r < data.laterRounds.length - 1) {
-            const nextRound = data.laterRounds[r+1];
+            const nextRound = data.laterRounds[r+1].matches;
             for (let i = 0; i < currentRound.length; i++) {
                 const match = currentRound[i];
                 const nextMatchIdx = Math.floor(i / 2);
@@ -423,9 +451,10 @@ function updateLaterRoundsCascading(data) {
             }
         }
     }
-    const lastRound = data.laterRounds[data.laterRounds.length - 1];
+    const lastRound = data.laterRounds[data.laterRounds.length - 1].matches;
     data.champion = lastRound[0].winner;
 }
+
 
 window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
     // 🔥 MODO SOLO LECTURA: El Súper Admin no puede tocar los brackets
@@ -436,12 +465,13 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
 
     if (phase === 'round1') match = data.round1Matches[matchIdx];
     else if (phase === 'repechage') match = data.repechageMatches[matchIdx];
-    else if (phase === 'laterRounds') match = data.laterRounds[matchIdx[0]][matchIdx[1]];
+    else if (phase === 'laterRounds') match = data.laterRounds[matchIdx[0]].matches[matchIdx[1]];
 
     if (!match || (!match.player1 && phase !== 'repechage') || match.isBye) return;
 
     match.winner = match.winner === playerName ? null : playerName;
 
+    // Lógica de perdedores hacia el repechaje
     if (phase === 'round1') {
         const loser = match.winner === match.player1 ? match.player2 : (match.winner === match.player2 ? match.player1 : null);
         const repMatchIdx = Math.floor(matchIdx / 2);
@@ -459,27 +489,20 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
         }
     }
 
-    if (phase === 'round1') {
-        const loser = match.winner === match.player1 ? match.player2 : (match.winner === match.player2 ? match.player1 : null);
-        const repMatchIdx = Math.floor(matchIdx / 2);
-        const isPlayer1 = matchIdx % 2 === 0;
-        const repMatch = data.repechageMatches[repMatchIdx];
-
-        if (repMatch) {
-            if (isPlayer1) {
-                repMatch.player1 = loser;
-                if (!loser && repMatch.winner === repMatch.player1) repMatch.winner = null;
-            } else {
-                repMatch.player2 = loser;
-                if (!loser && repMatch.winner === repMatch.player2) repMatch.winner = null;
-            }
+    // 🔥 BLINDAJE ANTI-AMNESIA: Verificamos estados precisos de las fases
+    if (phase === 'round1' || phase === 'repechage') {
+        // Si el admin se arrepiente y "desmarca" a alguien, volvemos a bloquear Fase 2
+        if (match.winner === null) {
+            data.laterRounds = []; 
+            data.champion = null;
+        } else {
+            checkPhase1Completion(data);
         }
+    } else {
+        updateLaterRoundsCascading(data);
     }
 
-    if (phase === 'round1' || phase === 'repechage') checkPhase1Completion(data);
-    else updateLaterRoundsCascading(data);
-
-    // Actualizamos los datos visuales (que ahora ya saben cómo cuidar su propio scroll)
+    // Actualizamos los datos visuales
     renderTournament(cat, subView);
 
     // Guardamos en la nube
@@ -652,7 +675,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
         const totalRounds = data.laterRounds.length;
         
         for (let rIdx = 0; rIdx < totalRounds - 1; rIdx++) {
-            let matches = data.laterRounds[rIdx];
+            let matches = data.laterRounds[rIdx].matches;
             let leftMatches = matches.slice(0, matches.length / 2);
             let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
             let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
@@ -665,7 +688,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 
         html += `<div class="bracket-col justify-center px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/30 rounded-3xl pb-8">
                     <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-amber-600 uppercase tracking-widest border-b-2 border-amber-200 pb-2">Gran Final</h4>`;
-        let finalMatch = data.laterRounds[totalRounds - 1][0];
+        let finalMatch = data.laterRounds[totalRounds - 1].matches[0];
         html += renderMatchBox(cat, 'laterRounds', [totalRounds - 1, 0], finalMatch, subView);
         
         if (data.champion) {
@@ -680,7 +703,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
         html += `</div>`;
 
         for (let rIdx = totalRounds - 2; rIdx >= 0; rIdx--) {
-            let matches = data.laterRounds[rIdx];
+            let matches = data.laterRounds[rIdx].matches;
             let rightMatches = matches.slice(matches.length / 2);
             let titleIndex = roundTitles.length - (totalRounds - 1 - rIdx);
             let phaseTitle = titleIndex >= 0 ? roundTitles[titleIndex] : `Ronda ${rIdx + 2}`;
@@ -1146,59 +1169,12 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
 window.activarModoArena = function() {
-    // Magia: Pedimos pantalla completa a TODA la página, no solo al cuadro.
-    if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
-    }
-};
-
-window.salirModoArena = function() {
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    }
+    // Averiguamos en qué categoría estamos y abrimos la pestaña pública
+    const activeView = document.querySelector('.view.active')?.id.replace('view-', '') || 'pequenos';
+    window.open(`pantalla_publico.html?cat=${activeView}`, '_blank');
 };
 
 
-// 🚨 VIGILANTE DE EVENTOS: Detecta si entramos o salimos de pantalla completa
-document.addEventListener('fullscreenchange', () => {
-    const isArena = !!document.fullscreenElement;
-    const mainHeader = document.querySelector('header');
-    const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
-    
-    // 1. Ocultar o Mostrar el Encabezado Principal de FIME
-    if (isArena) {
-        if (mainHeader) mainHeader.style.display = 'none';
-    } else {
-        if (mainHeader) mainHeader.style.display = '';
-    }
-
-    // 2. MODO COMBATES (Brackets): Usamos tu lógica manual para no perder la posición del Scroll
-    if (['pequenos', 'mediano', 'grandes'].includes(activeView)) {
-        const workspace = document.getElementById('arena-workspace');
-        const header = document.getElementById('arena-header');
-        const scoreboard = document.getElementById('arena-scoreboard');
-        
-        if (isArena) {
-            if (header) header.style.display = 'none';
-            if (scoreboard) { scoreboard.classList.remove('hidden'); scoreboard.classList.add('flex'); }
-            if (workspace) {
-                workspace.classList.add('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
-                workspace.classList.remove('h-[85vh]');
-            }
-        } else {
-            if (header) header.style.display = ''; 
-            if (scoreboard) { scoreboard.classList.add('hidden'); scoreboard.classList.remove('flex'); }
-            if (workspace) {
-                workspace.classList.remove('!fixed', '!top-0', '!left-0', '!w-screen', '!h-screen', '!z-[9999]', 'p-6', 'bg-gray-100');
-                workspace.classList.add('h-[85vh]');
-            }
-        }
-    } 
-    // 3. MODO CARRERAS (Tiempos): Redibujamos porque el CSS de pantalla completa ya viene inyectado
-    else if (['seguimiento', 'evasor'].includes(activeView)) {
-        renderTimeTable(activeView);
-    }
-});
 
 // --- ESTILO PARA EL MODAL (Animación suave) ---
 if (!document.getElementById('modal-styles')) {
@@ -1356,12 +1332,12 @@ window.nuclearResetCarreras = async function(cat) {
     } catch(e) { console.error(e); alert("Error en el borrado nuclear."); }
 };
 
-// 2. Inyección de Monitores en el Lobby (Para Súper Admin y Admins Normales)
+
+// 2. Conexión del Panel (Monitores para Súper Admin / Controles para Admin Normal)
 function inyectarOjoDeDios() {
     const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
     const miCatAdmin = sessionStorage.getItem('juez_categoria');
     
-    // Función para sacar el "tag" corto de la categoría del Admin normal
     function getMiTag() {
         if(!miCatAdmin) return '';
         const b = miCatAdmin.toLowerCase();
@@ -1373,140 +1349,146 @@ function inyectarOjoDeDios() {
         return '';
     }
     const miTag = getMiTag();
-
     const categorias = ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'];
     
     categorias.forEach(cat => {
-        // Si no eres Súper Admin, y esta categoría NO es la tuya, nos la saltamos.
-        if (!isSuperAdmin && cat !== miTag) return;
-
-        const card = document.querySelector(`[onclick="openCategory('${cat}')"]`);
-        if(!card) return;
-
-        // 🔥 Candado de ancho para que coincida perfecto con la tarjeta
-        const wrapper = document.createElement('div');
-        wrapper.className = "flex flex-col gap-3 relative w-full max-w-[340px] mx-auto sm:mx-0";
-        card.parentNode.insertBefore(wrapper, card);
-        wrapper.appendChild(card);
-        card.classList.add('w-full');
-
+        const panel = document.getElementById(`panel-superadmin-${cat}`);
+        if (!panel) return;
         const isCarrera = cat === 'seguimiento' || cat === 'evasor';
 
-        const panel = document.createElement('div');
-        
-        // 🔥 Colores FIME para Admin vs Ámbar para Súper Admin
-        const panelEstilo = isSuperAdmin 
-            ? "bg-amber-50 border-2 border-amber-200" 
-            : "bg-emerald-50 border-2 border-emerald-600"; 
+        if (isSuperAdmin) {
+            // SÚPER ADMIN: Solo ve el panel de lectura (Monitor)
+            panel.classList.remove('hidden');
+        } else if (cat === miTag) {
+            // ADMIN NORMAL: Convertimos el panel en sus controles de combate
+            panel.classList.remove('hidden');
+            panel.className = "bg-emerald-50 border-2 border-emerald-600 rounded-2xl p-4 shadow-sm w-full transition-all animate-fade-in";
+            const tituloPanel = isCarrera ? '🏎️ Control de Pista' : '🥊 Control de Arena';
             
-        panel.className = `${panelEstilo} rounded-xl p-3 shadow-md cursor-default z-10 transition-all animate-fade-in w-full`;
-        panel.onclick = (e) => e.stopPropagation(); 
+            // Inyectamos los botones y selectores
+            panel.innerHTML = `
+                <h4 class="text-[10px] font-black uppercase tracking-wider text-emerald-800 mb-3 flex items-center justify-center">${tituloPanel}</h4>
+                <div class="flex gap-2 mb-3">
+                    <select id="sa-r1-${cat}" class="${isCarrera ? 'w-full' : 'w-1/2'} p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-emerald-500 transition-all">
+                        <option value="">-- ESPERANDO R1 --</option>
+                    </select>
+                    ${isCarrera ? '' : `
+                    <span class="text-xs font-black text-red-500 self-center">VS</span>
+                    <select id="sa-r2-${cat}" class="w-1/2 p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-emerald-500 transition-all">
+                        <option value="">-- ESPERANDO R2 --</option>
+                    </select>`}
+                </div>
+                <div class="flex gap-2">
+                    <button id="sa-btn-iniciar-${cat}" onclick="saAccionArena('${cat}', 'iniciar')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">Iniciar</button>
+                    <button onclick="saAccionArena('${cat}', 'ko')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">${isCarrera ? '🏁 Fin' : '🥊 K.O.'}</button>
+                    <button onclick="saAccionArena('${cat}', 'limpiar')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
+                </div>
+            `;
+        }
 
-        const tituloPanel = isSuperAdmin ? `👁️ Ojo de Dios: ${cat}` : `🥊 Control de Arena`;
-        const colorTitulo = isSuperAdmin ? "text-amber-800" : "text-emerald-800";
-
-        panel.innerHTML = `
-            <h4 class="text-[10px] font-black uppercase tracking-wider ${colorTitulo} mb-2 flex items-center gap-1 justify-center">
-                ${tituloPanel}
-            </h4>
-            
-            <div class="flex gap-2 mb-3">
-                <select id="sa-r1-${cat}" class="${isCarrera ? 'w-full' : 'w-1/2'} p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm focus:border-emerald-500 focus:outline-none transition-all text-[10px]">
-                    <option value="">-- ESPERANDO R1 --</option>
-                </select>
-                ${isCarrera ? '' : `
-                <span class="text-xs font-black text-red-500 self-center transition-all">VS</span>
-                <select id="sa-r2-${cat}" class="w-1/2 p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm focus:border-emerald-500 focus:outline-none transition-all text-[10px]">
-                    <option value="">-- ESPERANDO R2 --</option>
-                </select>`}
-            </div>
-
-            <div class="flex gap-2">
-                <button id="sa-btn-iniciar-${cat}" onclick="saAccionArena('${cat}', 'iniciar')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">Iniciar</button>
-                <button id="sa-btn-ko-${cat}" onclick="saAccionArena('${cat}', 'ko')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">${isCarrera ? '🏁 Fin Carrera' : '🥊 K.O.'}</button>
-                <button onclick="saAccionArena('${cat}', 'limpiar')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
-            </div>
-        `;
-        wrapper.appendChild(panel);
-
-        // 🔥 RECUPERADO: Radar de la Arena para cambiar el botón a "En Curso"
-        onSnapshot(doc(db, "arenas", cat), (docSnap) => {
-            if(!docSnap.exists()) return;
-            const data = docSnap.data();
-            const selR1 = document.getElementById(`sa-r1-${cat}`);
-            const selR2 = document.getElementById(`sa-r2-${cat}`);
-            const btnIniciar = document.getElementById(`sa-btn-iniciar-${cat}`);
-            
-            if(!selR1 || !btnIniciar) return;
-
-            if(data.robot1) selR1.value = data.robot1;
-            if(selR2 && data.robot2) selR2.value = data.robot2;
-            
-            if (data.estado === 'peleando') {
-                btnIniciar.className = "flex-1 bg-amber-500 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md cursor-not-allowed";
-                btnIniciar.innerHTML = "⏳ Combate en Curso...";
-                btnIniciar.disabled = true;
-            } else {
-                btnIniciar.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
-                btnIniciar.innerHTML = "Iniciar";
-                btnIniciar.disabled = false;
-                if(data.estado === 'inactivo') {
-                    selR1.value = '';
-                    if(selR2) selR2.value = '';
+        // Reconectamos el Radar a Firebase
+        if (isSuperAdmin || cat === miTag) {
+            onSnapshot(doc(db, "arenas", cat), (docSnap) => {
+                if(!docSnap.exists()) return;
+                const data = docSnap.data();
+                
+                if (isSuperAdmin) {
+                    // Actualiza solo etiquetas (Labels) para el Súper Admin
+                    const labelR1 = document.getElementById(`ojo-r1-${cat}`);
+                    const labelR2 = document.getElementById(`ojo-r2-${cat}`);
                     
-                    // 🔥 MAGIA: MARCAR GANADOR EN BRACKETS AUTOMÁTICAMENTE
-                    if (data.ganador_automatico) {
-                        const tData = tournamentData[cat];
-                        if (tData) {
-                            const marcarLlave = (fase, arr) => {
-                                if(!arr) return false;
-                                for(let i=0; i<arr.length; i++) {
-                                    let m = arr[i];
-                                    // Comprobamos si la pelea es de estos dos robots
-                                    if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
-                                        // Solo lo marcamos si la llave aún no tiene ganador
-                                        if (m.winner === null) {
-                                            window.selectWinner(cat, fase, i, data.ganador_automatico, currentSubView);
-                                            return true;
-                                        }
+                    if (labelR1) {
+                        if (data.robot1 && data.estado !== 'inactivo') {
+                            labelR1.innerText = data.robot1;
+                            labelR1.className = "text-[11px] font-black text-emerald-700 uppercase";
+                        } else {
+                            labelR1.innerText = isCarrera ? "-- Pista Libre --" : "-- Esperando --";
+                            labelR1.className = "text-[11px] font-bold text-gray-400 uppercase";
+                        }
+                    }
+                    if (!isCarrera && labelR2) {
+                        if (data.robot2 && data.estado !== 'inactivo') {
+                            labelR2.innerText = data.robot2;
+                            labelR2.className = "text-[11px] font-black text-emerald-700 uppercase";
+                        } else {
+                            labelR2.innerText = "-- Esperando --";
+                            labelR2.className = "text-[11px] font-bold text-gray-400 uppercase";
+                        }
+                    }
+                } else {
+                    // Actualiza selectores y bloquea/desbloquea botones para el Admin Normal
+                    const selR1 = document.getElementById(`sa-r1-${cat}`);
+                    const selR2 = document.getElementById(`sa-r2-${cat}`);
+                    const btnIniciar = document.getElementById(`sa-btn-iniciar-${cat}`);
+                    
+                    if(selR1 && data.robot1) selR1.value = data.robot1;
+                    if(selR2 && data.robot2) selR2.value = data.robot2;
+                    
+                    if(btnIniciar) {
+                        if (data.estado === 'peleando') {
+                            btnIniciar.className = "flex-1 bg-amber-500 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md cursor-not-allowed";
+                            btnIniciar.innerHTML = "⏳ En Curso...";
+                            btnIniciar.disabled = true;
+                        } else {
+                            btnIniciar.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
+                            btnIniciar.innerHTML = "Iniciar";
+                            btnIniciar.disabled = false;
+                            if(data.estado === 'inactivo') {
+                                if(selR1) selR1.value = '';
+                                if(selR2) selR2.value = '';
+                            }
+                        }
+                    }
+                }
+                
+                // Marca el Ganador Automático
+                if (data.estado === 'inactivo' && data.ganador_automatico) {
+                    const tData = tournamentData[cat];
+                    if (tData) {
+                        const marcarLlave = (fase, arr) => {
+                            if(!arr) return false;
+                            for(let i=0; i<arr.length; i++) {
+                                let m = arr[i];
+                                if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
+                                    if (m.winner === null) {
+                                        window.selectWinner(cat, fase, i, data.ganador_automatico, currentSubView);
+                                        return true;
                                     }
                                 }
-                                return false;
-                            };
-
-                            let encontrado = false;
-                            if(!encontrado) encontrado = marcarLlave('round1', tData.round1Matches);
-                            if(!encontrado) encontrado = marcarLlave('repechage', tData.repechageMatches);
-                            if(!encontrado && tData.laterRounds) {
-                                for(let r=0; r<tData.laterRounds.length; r++) {
-                                    for(let i=0; i<tData.laterRounds[r].length; i++) {
-                                        let m = tData.laterRounds[r][i];
-                                        if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
-                                            if (m.winner === null) {
-                                                window.selectWinner(cat, 'laterRounds', [r, i], data.ganador_automatico, currentSubView);
-                                                encontrado = true;
-                                            }
-                                        }
+                            }
+                            return false;
+                        };
+                        let encontrado = false;
+                        if(!encontrado) encontrado = marcarLlave('round1', tData.round1Matches);
+                        if(!encontrado) encontrado = marcarLlave('repechage', tData.repechageMatches);
+                        if(!encontrado && tData.laterRounds) {
+                        for(let r=0; r<tData.laterRounds.length; r++) {
+                            for(let i=0; i<tData.laterRounds[r].matches.length; i++) {
+                                let m = tData.laterRounds[r].matches[i];
+                                if ((m.player1 === data.robot1 && m.player2 === data.robot2) || (m.player1 === data.robot2 && m.player2 === data.robot1)) {
+                                    if (m.winner === null) {
+                                        window.selectWinner(cat, 'laterRounds', [r, i], data.ganador_automatico, currentSubView);
+                                        encontrado = true;
                                     }
                                 }
                             }
                         }
-                        // Borramos la señal de Firebase para que no se cicle
-                        updateDoc(doc(db, "arenas", cat), { ganador_automatico: null });
                     }
                 }
-            }
-        });
-    }); // <-- Aquí cierra correctamente el ciclo de las categorías
+                    updateDoc(doc(db, "arenas", cat), { ganador_automatico: null });
+                }
+            });
+        }
+    });
 
-    // Rellenar las listas de robots en tiempo real
-    onSnapshot(collection(db, "competidores"), (snap) => {
-        let comp = [];
-        snap.forEach(doc => comp.push(doc.data()));
-        
-        categorias.forEach(cat => {
-            const selR1 = document.getElementById(`sa-r1-${cat}`);
-            const selR2 = document.getElementById(`sa-r2-${cat}`);
+    // Restauramos el llenado de los selectores (Solo para el Admin Normal)
+    if (!isSuperAdmin && miTag) {
+        onSnapshot(collection(db, "competidores"), (snap) => {
+            let comp = [];
+            snap.forEach(doc => comp.push(doc.data()));
+            
+            const selR1 = document.getElementById(`sa-r1-${miTag}`);
+            const selR2 = document.getElementById(`sa-r2-${miTag}`);
             if(!selR1) return;
             
             const currentR1 = selR1.value;
@@ -1516,7 +1498,7 @@ function inyectarOjoDeDios() {
             comp.filter(c => {
                 let cTag = c.categoria_tag || '';
                 let cOrig = (c.categoria_original || '').toLowerCase();
-                return cTag === cat || cOrig.includes(cat.substring(0,4));
+                return cTag === miTag || cOrig.includes(miTag.substring(0,4));
             }).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
                 opts += `<option value="${c.nombre}">${c.nombre}</option>`;
             });
@@ -1527,10 +1509,10 @@ function inyectarOjoDeDios() {
             selR1.value = currentR1;
             if(selR2) selR2.value = currentR2;
         });
-    });
+    }
 }
 
-// 3. Funciones de Control Override
+// 3. Restauramos las Funciones de Control (Iniciar, K.O., Limpiar)
 window.saAccionArena = async function(cat, accion) {
     const arenaRef = doc(db, "arenas", cat);
     
@@ -1562,6 +1544,13 @@ window.saAccionArena = async function(cat, accion) {
             tiempo_inicio: Date.now() / 1000 
         });
     }
+};
+
+
+// 3. Funciones de Control Override (Solo queda Limpiar)
+window.limpiarArenaLocal = async function(cat) {
+    if(!confirm(`🧹 ¿Forzar la limpieza de la arena de ${cat.toUpperCase()}?`)) return;
+    await setDoc(doc(db, "arenas", cat), { robot1: '', robot2: '', estado: 'inactivo' });
 };
 
 // Arrancamos los motores al cargar el script
@@ -1609,3 +1598,34 @@ function filtrarLobbyParaAdmins() {
 
 // Ejecutamos el filtro un instante después de cargar la página
 setTimeout(filtrarLobbyParaAdmins, 100);
+
+
+// 🔥 1. POP-UP INVENCIBLE EN MODO ARENA (Z-Index Extremo)
+window.lanzarPopUpFase1 = function() {
+    const pop = document.createElement('div');
+    // Le pusimos z-[999999] para asegurar que rompa la pantalla completa
+    pop.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-all";
+    pop.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in">
+            <div class="text-6xl mb-4 animate-bounce">🎉</div>
+            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
+            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
+            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-emerald-50 py-2 rounded-lg border border-emerald-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
+        </div>
+    `;
+    // Lo inyectamos directo en el nivel más alto
+    document.documentElement.appendChild(pop);
+    setTimeout(() => { pop.remove(); }, 10000); // 10 segundos de gloria
+};
+
+// 🛡️ 2. FRENO DE MANO PARA EVITAR AMNESIA DE FIREBASE
+window.salidaSeguraPanel = function() {
+    // Oscurecemos ligeramente el botón para que el usuario sepa que hizo clic
+    document.body.style.opacity = '0.7';
+    document.body.style.pointerEvents = 'none';
+    
+    // Le damos 500 milisegundos (medio segundo) a Firebase para terminar de subir el último check
+    setTimeout(() => {
+        window.location.href = 'index.html';
+    }, 500);
+};

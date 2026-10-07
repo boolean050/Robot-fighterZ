@@ -3,72 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guerra de Robots - Proyección Pública</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module" src="portal_jueces_backend.js"></script>
+    <script type="module" src="pantalla_publico_backend.js"></script>
+    <style>
+        /* ESTILOS CORE DE BRACKETS (Igual que el admin, pero sin efectos hover) */
+        .bracket-wrapper { display: flex; flex-direction: row; align-items: flex-start; justify-content: safe center; padding: 4rem; min-height: 100%; min-width: max-content; background: transparent; }
+        .bracket-col { display: flex; flex-direction: column; justify-content: flex-start; position: relative; min-width: 280px; gap: 1.5rem; margin: 0 1.75rem; flex-shrink: 0; }
+        .match-container { display: flex; flex-direction: column; justify-content: center; position: relative; width: 100%; }
+        .phase-2-tree .col-left .match-container::after { content: ''; position: absolute; right: -3.5rem; top: 50%; width: 3.5rem; height: 3px; background-color: #cbd5e1; z-index: 0; }
+        .phase-2-tree .col-right .match-container::before { content: ''; position: absolute; left: -3.5rem; top: 50%; width: 3.5rem; height: 3px; background-color: #cbd5e1; z-index: 0; }
+        
+        .match-card { background: white; border: 2px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; z-index: 10; position: relative; box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1); overflow: hidden; width: 100%; }
+        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #f1f5f9; min-height: 52px; }
+        .player-row:last-child { border-bottom: none; }
+        .player-row.winner { background: #10b981; border-color: #059669; }
+        .player-row.winner .player-name { color: white; }
+        .player-row.winner .docente-text { color: #d1fae5; }
+        .player-row.winner-rep { background: #fef08a !important; border-color: #f59e0b !important; }
+        .player-row.winner-rep .player-name { color: #78350f !important; }
+        .player-row.winner-rep .docente-text { color: #92400e !important; }
 
-    <title>Guerra de Robots - Panel Oficial FIME</title>
-
-    <!--------------------------------------------------------------------------->
-    
+        .player-info { display: flex; flex-direction: column; overflow: hidden; }
+        .player-name { font-weight: 900; font-size: 0.85rem; color: #1e293b; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+        .docente-text { font-size: 0.6rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; margin-top: 3px; }
+        .score-box { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 0.9rem; border-radius: 6px; background: transparent; }
+        
+        /* Modal Invencible */
+        .modal-overlay { z-index: 999999; backdrop-filter: blur(8px); }
+        .modal-content { animation: modalFadeIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #059669; border-radius: 10px; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans min-h-screen p-8 flex flex-col justify-between">
-
-    <header class="relative text-center mb-10 pt-4">
-        
-        <div class="absolute top-0 left-0 hidden md:block">
-            <img src="/static/images/logofime.gif" 
-                alt="Logo UANL" 
-                class="h-20 w-auto object-contain opacity-90">
-        </div>
-
-        <div class="absolute top-0 right-0 hidden md:block">
-            <img src="/static/images/osofime.svg" 
-                alt="Logo FIME" 
-                class="h-20 w-auto object-contain opacity-90">
-        </div>
-    
-        <h1 class="text-3xl md:text-5xl font-extrabold text-emerald-800 tracking-wider uppercase drop-shadow-sm md:px-24">
-            Guerra de Robots FIME
-        </h1>
-        <p class="text-emerald-900 text-sm md:text-lg font-bold tracking-wide mt-2">
-            Fase Inicial: Registro e Inscripción de Jueces
-        </p>
-        <div class="h-1.5 w-32 bg-emerald-800 mx-auto mt-4 rounded-full"></div>
-    </header>
-
-    <main class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 max-w-7xl mx-auto w-full items-start mb-auto">
-        
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-lg min-h-[250px] transition-all hover:border-emerald-800/30">
-            <h3 class="text-base font-extrabold text-emerald-800 text-center uppercase tracking-wider border-b-2 border-gray-100 pb-3 mb-4">Pequeños</h3>
-            <div id="lista-pequeños" class="space-y-3"></div>
-        </div>
-
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-lg min-h-[250px] transition-all hover:border-emerald-800/30">
-            <h3 class="text-base font-extrabold text-emerald-800 text-center uppercase tracking-wider border-b-2 border-gray-100 pb-3 mb-4">Mediano</h3>
-            <div id="lista-mediano" class="space-y-3"></div>
-        </div>
-
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-lg min-h-[250px] transition-all hover:border-emerald-800/30">
-            <h3 class="text-base font-extrabold text-emerald-800 text-center uppercase tracking-wider border-b-2 border-gray-100 pb-3 mb-4">Grandes</h3>
-            <div id="lista-grandes" class="space-y-3"></div>
-        </div>
-
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-lg min-h-[250px] transition-all hover:border-emerald-800/30">
-            <h3 class="text-base font-extrabold text-emerald-800 text-center uppercase tracking-wider border-b-2 border-gray-100 pb-3 mb-4">Seg. Línea</h3>
-            <div id="lista-seguimiento-de-línea" class="space-y-3"></div>
-        </div>
-
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-lg min-h-[250px] transition-all hover:border-emerald-800/30">
-            <h3 class="text-base font-extrabold text-emerald-800 text-center uppercase tracking-wider border-b-2 border-gray-100 pb-3 mb-4">Evasor Obs.</h3>
-            <div id="lista-evasor-de-obstáculos" class="space-y-3"></div>
-        </div>
-
-    </main>
-
-    <footer class="mt-12 text-center text-xs font-bold text-emerald-900 border-t border-gray-200 pt-4 uppercase tracking-wider">
-        FACULTAD DE INGENIERÍA MECÁNICA Y ELÉCTRICA • UANL
-    </footer>
-
-    
+<body class="bg-gray-100 text-gray-900 font-sans w-screen h-screen overflow-hidden flex" id="proyeccion-root">
+    <!-- Aquí se inyecta la arena mediante JS -->
 </body>
 </html>
