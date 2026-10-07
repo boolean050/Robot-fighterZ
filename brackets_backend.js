@@ -13,7 +13,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-
+// =====================================================================
+// 🛑 CADENERO DE SEGURIDAD ABSOLUTA (BLINDAJE DE URL)
+// =====================================================================
+if (!sessionStorage.getItem('juez_nombre') || !sessionStorage.getItem('juez_role')) {
+    // Si no tiene gafete de sesión, lo pateamos a la pantalla de Login inmediatamente
+    window.location.replace('index.html'); 
+    // Usamos replace() en vez de href para que no puedan usar la flecha de "Atrás" para volver a entrar
+    
+    // Detenemos por completo la lectura del resto del código para que no cargue datos sensibles
+    throw new Error("🔒 Acceso no autorizado. Redirigiendo al login...");
+}
 
 // =====================================================================
 // MOTOR CORE OPTIMIZADO - BRACKETS CLÁSICOS
@@ -289,12 +299,15 @@ function showView(viewId) {
 window.goToMenu = () => {
     showView('menu');
     document.getElementById('btnReturnAdmin').classList.remove('hidden');
+    document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // 🔥 Esta línea aniquila el bug
 };
+
 window.openCategory = (cat) => {
     showView(cat);
     document.getElementById('btnReturnAdmin').classList.add('hidden');
+    document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // 🔥 Lo mantenemos oculto al entrar a la tarjeta inicial
+    
     if (['pequenos', 'mediano', 'grandes'].includes(cat)) {
-        // 🔥 FORZAMOS LA VISTA AL MENÚ SIEMPRE QUE SE ENTRE DESDE EL LOBBY
         renderTournament(cat, 'menu');
     } else {
         renderTimeTable(cat);
@@ -690,6 +703,9 @@ window.renderTournament = function renderTournament(cat, subView = null) {
         html += `</div>`;
     
     } else if (subView === 'phase2') {
+
+        if (!isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); 
+        
         html += `<div class="bracket-wrapper min-w-max justify-center">`;
         const roundTitles = ["Ronda 2", "Octavos", "Cuartos", "Semifinal"];
         const totalRounds = data.laterRounds.length;
