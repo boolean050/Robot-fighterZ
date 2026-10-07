@@ -395,8 +395,8 @@ window.cargarDatosAdmin = function() {
                     `;
                 }
             } else {
-                // FILTRO: Si es Admin Normal, solo dibuja jueces que sean de su misma categoría
-                if (!yoSoySuper && (m.categoria || '').toLowerCase() !== (miCategoriaAdmin || '').toLowerCase()) {
+                // FILTRO INTELIGENTE: Usa el traductor para ignorar plurales ("Mediano" == "Medianos")
+                if (!yoSoySuper && window.obtenerTagExacto(m.categoria) !== window.obtenerTagExacto(miCategoriaAdmin)) {
                     return; // Saltamos a este maestro
                 }
 
@@ -460,10 +460,11 @@ window.cargarDatosAdmin = function() {
             todosLosRobots.push({ id: docSnap.id, ...docSnap.data() }); 
         });
 
-        // FILTRO DE PODER: Comparamos en minúsculas para que no falle por acentos o mayúsculas
+        // FILTRO DE PODER: Usamos el traductor universal para que "Mediano" y "Medianos" sean la misma categoría
         let equiposFiltrados = todosLosRobots;
         if (!yoSoySuper && miCategoriaAdmin) {
-            equiposFiltrados = todosLosRobots.filter(r => (r.categoria_original || '').toLowerCase() === miCategoriaAdmin.toLowerCase());
+            const miTag = window.obtenerTagExacto(miCategoriaAdmin);
+            equiposFiltrados = todosLosRobots.filter(r => window.obtenerTagExacto(r.categoria_original || r.categoria_tag) === miTag);
         }
 
         equiposFiltrados.sort((a, b) => (a.categoria_original || 'Z').localeCompare(b.categoria_original || 'Z'));
@@ -1081,16 +1082,7 @@ document.getElementById('btnGuardarNuevoEquipo')?.addEventListener('click', asyn
     }
 });
 
-// --- TRADUCTOR UNIVERSAL (Restaurado) ---
-window.obtenerTagExacto = function(categoria) {
-    if(!categoria) return 'sin_categoria';
-    let base = categoria.toLowerCase().trim();
-    if(catMap[categoria]) return catMap[categoria];
-    for(let key in catMap) {
-        if(base.includes(key.toLowerCase()) || key.toLowerCase().includes(base)) return catMap[key];
-    }
-    return base;
-}
+
 
 // --- TRADUCTOR UNIVERSAL (Restaurado para que no haya errores) ---
 window.obtenerTagExacto = function(categoria) {
