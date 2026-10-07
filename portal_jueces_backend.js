@@ -109,7 +109,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             return;
         }
 
-        await updateDoc(docRef, { sesion_activa: true });
+        await updateDoc(docRef, { sesion_activa: true, fuerza_relogin: null });
         
         // Revisar qué rol tiene guardado en Firebase
         const rolUsuario = data.rol || 'juez';
@@ -286,11 +286,15 @@ function iniciarRadarSesion() {
             return;
         }
 
-        // 3. EXPULSIÓN / CIERRE DE SESIÓN NORMAL
+        // 3. EXPULSIÓN / CIERRE DE SESIÓN NORMAL O POR CAMBIO DE CLAVE
         if (data.sesion_activa === false) {
-            mostrarMensajeYSalir("Tu sesión ha sido cerrada por el sistema.", "🚪");
+            if (data.fuerza_relogin === "password") {
+                mostrarMensajeYSalir("Tu contraseña fue actualizada por el Súper Admin. Por favor, vuelve a ingresar con tu nueva clave.", "🔑");
+            } else {
+                mostrarMensajeYSalir("Tu sesión ha sido cerrada por el sistema.", "🚪");
+            }
             return;
-        } 
+        }
         
         // 4. CAMBIO DE CATEGORÍA
         if (data.categoria && data.categoria !== currentCategory) {
@@ -541,9 +545,11 @@ document.getElementById('btnGuardarEdicion')?.addEventListener('click', async ()
         // Preparamos los datos a enviar
         let actualizaciones = { categoria: nuevaCat };
         
-        // Si el admin escribió algo en la contraseña, también la actualizamos
+        // Si el admin escribió algo en la contraseña, la actualizamos y forzamos el cierre de sesión
         if (nuevaPass !== '') {
             actualizaciones.password = nuevaPass;
+            actualizaciones.sesion_activa = false; // Expulsa al usuario
+            actualizaciones.fuerza_relogin = "password"; // Bandera para el mensaje bonito
         }
         
         await updateDoc(doc(db, "maestros_autorizados", idDocenteEditando), actualizaciones);

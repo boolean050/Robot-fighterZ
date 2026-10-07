@@ -103,7 +103,11 @@ function iniciarRadarSesionBrackets() {
         // 1. EXPULSIÓN O CAMBIO DE CONTRASEÑA (Cierre de sesión forzado)
         if (data.sesion_activa === false) {
             sessionStorage.clear();
-            alert("🚪 Tu sesión ha sido cerrada o modificada por el sistema.");
+            if (data.fuerza_relogin === "password") {
+                alert("🔑 Tu contraseña ha sido actualizada por el Súper Admin. Inicia sesión de nuevo.");
+            } else {
+                alert("🚪 Tu sesión ha sido cerrada por el sistema.");
+            }
             window.location.href = 'index.html';
             return;
         }
@@ -130,8 +134,8 @@ function iniciarRadarSesionBrackets() {
 
 function cargarDatosDesdeServidor() {
     onSnapshot(collection(db, "competidores"), (snapshot) => {
-        // 🔥 LIMPIEZA SEGURA: Solo vaciamos los nombres y puntos, INTOCABLES las llaves y ganadores
-        ['pequenos', 'mediano', 'grandes'].forEach(cat => {
+        // 🔥 LIMPIEZA SEGURA: Vaciamos los nombres y puntos de TODAS las categorías
+        ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'].forEach(cat => {
             if (!tournamentData[cat]) {
                 tournamentData[cat] = { participants: [], round1Matches: [], repechageMatches: [], laterRounds: [], phase: 'round1', puntosTotales: {} };
             } else {
