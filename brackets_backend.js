@@ -541,6 +541,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
     const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
 
     if (subView === 'menu') {
+        document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // Ocultar el botón superior
         let html = `
         <div class="w-full max-w-4xl mx-auto mt-4 mb-8">
             <div class="text-center mb-10 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden">
@@ -581,21 +582,33 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 
     const isArena = !!document.fullscreenElement;
     let html = `
-    <div id="arena-header" class="mb-6 w-full flex flex-col md:flex-row flex-wrap items-center justify-center md:justify-between gap-3 bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
-        <div class="flex w-full md:w-auto justify-center md:justify-start">
-            <button onclick="abrirModalPuntajes('${cat}')" class="w-full md:w-auto justify-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+    <div id="arena-header" class="mb-6 w-full bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-200" style="${isArena ? 'display: none;' : ''}">
+        
+        <!-- 🖥️ MODO PC: 2 botones centrados -->
+        <div class="hidden md:flex items-center justify-center gap-6">
+            <button onclick="abrirModalPuntajes('${cat}')" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
                 📊 Tabla de Puntajes
             </button>
-        </div>
-        <div class="flex w-full md:w-auto justify-center">
-            <button onclick="activarModoArena()" class="w-full md:w-auto justify-center bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
+            <button onclick="activarModoArena()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-8 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
                 🖥️ Modo Arena
             </button>
         </div>
-        <div class="flex w-full md:w-auto justify-center md:justify-end">
-            <button onclick="renderTournament('${cat}', 'menu')" class="w-full md:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-widest flex items-center gap-3 active:scale-95">
-                🔙 Menú Eliminatorias
+
+        <!-- 📱 MODO CELULAR: Hamburguesa Naranja -->
+        <div class="flex flex-col md:hidden w-full">
+            <button onclick="document.getElementById('mobile-menu-${cat.replace(/\s+/g,'')}').classList.toggle('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-white px-5 py-3.5 rounded-xl font-extrabold text-sm uppercase tracking-widest flex justify-center items-center gap-2 shadow-md hover:shadow-lg active:scale-95 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                Opciones del Torneo
             </button>
+            
+            <div id="mobile-menu-${cat.replace(/\s+/g,'')}" class="hidden flex-col mt-4 w-full border-t border-gray-100 pt-5 animate-fade-in space-y-4">
+                <button onclick="abrirModalPuntajes('${cat}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-3.5 rounded-xl font-extrabold shadow-sm text-xs uppercase tracking-widest flex justify-center items-center gap-2 active:scale-95 transition-transform">
+                    📊 Tabla de Puntajes
+                </button>
+                <button onclick="activarModoArena()" class="w-full bg-sky-100 hover:bg-sky-200 text-sky-900 border-2 border-sky-300 px-5 py-3.5 rounded-xl font-extrabold shadow-sm text-xs uppercase tracking-widest flex justify-center items-center gap-2 active:scale-95 transition-transform">
+                    🖥️ Modo Arena
+                </button>
+            </div>
         </div>
     </div>
 
@@ -642,6 +655,9 @@ window.renderTournament = function renderTournament(cat, subView = null) {
         html += `</div>`;
 
     } else if (subView === 'phase1') {
+
+        if (!isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); // Mostrar el botón superior
+
         html += `<div class="bracket-wrapper min-w-max justify-center">`;
         
         const r1Total = data.round1Matches.length;
@@ -1632,4 +1648,11 @@ window.salidaSeguraPanel = function() {
     setTimeout(() => {
         window.location.href = 'index.html';
     }, 500);
+};
+
+window.volverMenuEliminatorias = function() {
+    const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+    if (activeView) {
+        renderTournament(activeView, 'menu');
+    }
 };

@@ -82,9 +82,10 @@
             <div class="h-1.5 w-32 bg-emerald-800 mx-auto mt-4 rounded-full"></div>
         </div>
 
-        <!-- Zona Derecha: Volver al Panel -->
-        <div class="w-full md:w-1/3 flex justify-center md:justify-end order-3 md:order-3">
-            <!-- Fíjate cómo cambió el onclick -->
+        <!-- Zona Derecha: Volver al Panel y Menú Eliminatorias -->
+        <div class="w-full md:w-1/3 flex flex-col md:flex-row justify-center md:justify-end items-center md:items-center order-3 md:order-3 gap-3">
+            
+            <!-- Botón Original (Panel Admin) -->
             <button id="btnReturnAdmin" onclick="salidaSeguraPanel()"
                 class="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-xs uppercase tracking-widest flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
@@ -93,6 +94,15 @@
                         d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
                 </svg> Panel Admin
             </button>
+
+            <!-- NUEVO: Botón Menú Eliminatorias (Oculto por defecto) -->
+            <button id="btnTopMenuElim" onclick="volverMenuEliminatorias()"
+                class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-xs uppercase tracking-widest flex items-center gap-2 animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg> Menú Eliminatorias
+            </button>
+            
         </div>
 
     </header>
