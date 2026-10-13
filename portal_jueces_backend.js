@@ -857,9 +857,10 @@ function procesarExcel(file) {
             let conteo = 0;
 
             for (let i = 1; i < rows.length; i++) {
-                let nom = rows[i][1]; // Alias del Equipo
-                let cat = rows[i][2]; // Categoría
-                let fac = rows[i][3]; // Facultad
+                // Lectura directa del Excel crudo de Microsoft Forms
+                let nom = rows[i][5]; // Columna F (Índice 5): Alias del Equipo
+                let cat = rows[i][6]; // Columna G (Índice 6): Categoría
+                let fac = rows[i][7]; // Columna H (Índice 7): Facultad
 
                 if (!nom || !cat) continue;
                 
