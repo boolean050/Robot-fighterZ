@@ -15,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+
 // --- VARIABLES GLOBALES Y MEMORIA ---
 let currentUser = sessionStorage.getItem('juez_nombre');
 let currentCategory = sessionStorage.getItem('juez_categoria');
@@ -74,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else {
         mostrarPantalla('loginForm');
         document.getElementById('subtituloPrincipal').textContent = "Iniciar Sesión - Docentes";
+        document.getElementById('loginForm').reset();
     }
 });
 
@@ -147,6 +149,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         }
 
     } catch (error) {
+        console.error("EL ERROR REAL ES:", error); // PARA VER LOS ERRORES DEL LOGIN :)
         msg.textContent = "Error de conexión.";
         msg.classList.remove('hidden');
     }
@@ -887,7 +890,12 @@ function procesarExcel(file) {
             fb.className = "mt-2 text-[10px] font-bold p-2 rounded-lg text-center bg-emerald-100 text-emerald-800";
             fb.innerHTML = `✅ ¡ÉXITO! ${conteo} equipos agregados al padrón.`;
             window.cargarDatosAdmin(); 
-            fb.classList.remove('hidden');
+            fb.classList.remove('hidden'); // <-- ESTE LO DEJAS (Para que aparezca)
+
+            // <-- Y AGREGAS ESTE (Para que desaparezca a los 4 segundos)
+            setTimeout(() => {
+                fb.classList.add('hidden');
+            }, 4000);
         } catch (err) { 
             console.error("Error detallado:", err);
             alert("Ocurrió un error leyendo el Excel."); 
@@ -927,32 +935,48 @@ document.getElementById('btnSalirAdmin')?.addEventListener('click', async () => 
     window.location.reload();
 });
 
-// --- ELIMINAR EXCEL Y SUS EQUIPOS EN CASCADA ---
-window.eliminarArchivoExcel = async (historialId, fileName) => {
-    if(!confirm(`🗑️ ¿Estás seguro de borrar el archivo "${fileName}"?\n\nEsto eliminará a TODOS los equipos que se cargaron con este archivo, dejando intactos a los demás.`)) return;
+// --- ELIMINAR EXCEL Y SUS EQUIPOS EN CASCADA (CON REINICIO DE TORNEO) ---
+window.eliminarArchivoExcel = function(historialId, fileName) {
+    // Usamos el modal premium que ya tienes programado en lugar del alert feo
+    const mensaje = `🗑️ ¿Eliminar "${fileName}"? ADVERTENCIA: Esto borrará sus equipos y RESTABLECERÁ TODOS LOS PUNTAJES de todas las categorías (Reinicio de Torneo).`;
     
-    try {
-        // 1. Buscar a todos los equipos que tengan el tatuaje de este archivo
-        const q = query(collection(db, "competidores"), where("origen", "==", fileName));
-        const snapshot = await getDocs(q);
-        const batch = writeBatch(db);
+    abrirModalConfirmar(mensaje, async () => {
+        // Para que el Súper Admin sepa que se está borrando
+        document.getElementById('btnAceptarVeredicto').innerHTML = "⏳ BORRANDO...";
         
-        // 2. Apuntar la pistola a cada uno de esos equipos
-        snapshot.forEach((docSnap) => {
-            batch.delete(docSnap.ref); 
-        });
-        
-        // 3. Apuntar la pistola al registro del historial
-        batch.delete(doc(db, "historial_archivos", historialId)); 
-        
-        // 4. Jalar el gatillo (borrar todo de golpe)
-        await batch.commit();
-        alert(`✅ Archivo eliminado. Se borraron ${snapshot.size} equipos del padrón.`);
-        window.cargarDatosAdmin(); // Refrescar las tablas
-    } catch(e) {
-        console.error(e);
-        alert("Error al intentar eliminar el archivo.");
-    }
+        try {
+            const batch = writeBatch(db);
+            
+            // 1. Eliminar los equipos que nacieron de este archivo Excel
+            const qEquipos = query(collection(db, "competidores"), where("origen", "==", fileName));
+            const snapEquipos = await getDocs(qEquipos);
+            snapEquipos.forEach((docSnap) => batch.delete(docSnap.ref));
+            
+            // 2. Eliminar el registro del archivo del historial
+            batch.delete(doc(db, "historial_archivos", historialId)); 
+            
+            // 3. 🔥 ANIQUILAR TODOS LOS VEREDICTOS (Reset total de puntajes de combate)
+            const snapVeredictos = await getDocs(collection(db, "veredictos"));
+            snapVeredictos.forEach((docSnap) => batch.delete(docSnap.ref));
+
+            // 4. 🔥 ANIQUILAR TODOS LOS TIEMPOS (Reset total de carreras)
+            const snapTiempos = await getDocs(collection(db, "tiempos_carreras"));
+            snapTiempos.forEach((docSnap) => batch.delete(docSnap.ref));
+
+            // 5. Jalar el gatillo (ejecuta todos los borrados al mismo tiempo)
+            await batch.commit();
+            
+            alert(`✅ ¡Base de datos limpia! Se borraron ${snapEquipos.size} equipos y se reiniciaron todos los puntajes del torneo.`);
+            window.cargarDatosAdmin(); // Refrescar las tablas
+            
+        } catch(e) {
+            console.error("Error destruyendo base de datos:", e);
+            alert("Error al intentar eliminar el archivo y reiniciar el torneo.");
+        } finally {
+            // Restaurar el botón del modal por si se usa de nuevo
+            document.getElementById('btnAceptarVeredicto').innerHTML = "CONFIRMAR";
+        }
+    });
 };
 
 // --- ELIMINAR UN EQUIPO INDIVIDUAL DEL PADRÓN ---

@@ -1672,3 +1672,73 @@ window.volverMenuEliminatorias = function() {
         renderTournament(activeView, 'menu');
     }
 };
+
+// ==========================================
+// 🔥 REINICIO DE TORNEO GLOBAL (SUPER ADMIN)
+// ==========================================
+
+// Mostrar el botón SOLO si es Súper Admin
+document.addEventListener('DOMContentLoaded', () => {
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    if (isSuperAdmin) {
+        const btnGlobal = document.getElementById('contenedorResetGlobal');
+        if (btnGlobal) btnGlobal.classList.remove('hidden');
+    }
+});
+
+// La función de Reinicio Seguro (Conserva Equipos y Excel, pero reinicia puntajes)
+window.reiniciarTorneoGlobal = async function() {
+    const mensaje = "🚨 REINICIO DE TORNEO 🚨\n\n¿Estás seguro de reiniciar TODO el torneo?\nSe borrarán los veredictos (puntajes) y tiempos de carrera de todas las categorías.\n\n✅ ¡Tus equipos y Excel SE QUEDARÁN GUARDADOS!, pero todos regresarán a 0 puntos.\n\n¿Deseas continuar?";
+    
+    if(!confirm(mensaje)) return;
+    
+    const btn = document.querySelector('#contenedorResetGlobal button');
+    if(btn) btn.innerHTML = "⏳ REINICIANDO PUNTAJES...";
+    
+    try {
+        const batch = writeBatch(db);
+        
+        // 1. Borrar todos los Veredictos (Historial de combates)
+        const snapVeredictos = await getDocs(collection(db, "veredictos"));
+        snapVeredictos.forEach(docSnap => batch.delete(docSnap.ref));
+        
+        // 2. Borrar todos los Tiempos (Historial de carreras)
+        const snapTiempos = await getDocs(collection(db, "tiempos_carreras"));
+        snapTiempos.forEach(docSnap => batch.delete(docSnap.ref));
+        
+        // 3. 🛡️ SALVAR EQUIPOS PERO QUITARLES LOS PUNTOS 🛡️
+        const snapEquipos = await getDocs(collection(db, "competidores"));
+        snapEquipos.forEach(docSnap => {
+            // En vez de borrarlos, solo actualizamos sus puntos a cero
+            batch.update(docSnap.ref, { 
+                score: 0,
+                puntos: 0 
+            });
+        });
+        
+        // ¡NOTA! Ya NO tocamos la colección "historial_archivos". Así tus Excel se quedan ahí.
+        
+        // 4. Limpiar y apagar TODAS las Arenas
+        const arenasTags = ["pequenos", "mediano", "grandes", "seguimiento", "evasor"];
+        for(let tag of arenasTags) {
+            batch.update(doc(db, "arenas", tag), {
+                estado: 'inactivo', 
+                r1: '', r2: '', 
+                robot1: '', robot2: '', 
+                ganador_automatico: ''
+            });
+        }
+
+        // 5. Ejecutar la magia
+        await batch.commit();
+        
+        alert("✅ ¡TORNEO REINICIADO EXITOSAMENTE!\nTodos los equipos siguen en la lista y los brackets se mezclarán solos.");
+        window.location.reload();
+        
+    } catch (e) {
+        console.error("🔥 Error en el reinicio global:", e);
+        alert("Ocurrió un error al reiniciar. Revisa la consola F12.");
+    } finally {
+        if(btn) btn.innerHTML = "⚠️ REINICIAR TODOS LOS TORNEOS ⚠️";
+    }
+};
