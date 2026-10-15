@@ -69,6 +69,19 @@ document.addEventListener('DOMContentLoaded', () => {
             tournamentData.laterRounds = data.laterRounds || [];
             tournamentData.champion = data.champion || null;
             tournamentData.byePlayer = data.byePlayer || null;
+
+            // 🔥 DETECTOR DEL GRAN CAMPEÓN
+            if (tournamentData.champion) {
+                if (!window.campeonRegistradoComoNotificado) {
+                    window.campeonRegistradoComoNotificado = true;
+                    if (typeof window.lanzarPopUpCampeon === 'function') {
+                        window.lanzarPopUpCampeon(tournamentData.champion);
+                    }
+                }
+            } else {
+                window.campeonRegistradoComoNotificado = false;
+                window.confetiCampeonLanzado = false;
+            }
             
             let r1Done = tournamentData.round1Matches.length > 0 && tournamentData.round1Matches.every(m => m.winner !== null);
             let repDone = tournamentData.repechageMatches.length === 0 || tournamentData.repechageMatches.every(m => m.winner !== null);
@@ -380,3 +393,69 @@ function renderTimeTable() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+
+window.lanzarPopUpCampeon = function(nombreGanador) {
+    if (window.confetiCampeonLanzado) return;
+    window.confetiCampeonLanzado = true;
+
+    // 1. Limpieza previa por si acaso
+    const viejoPop = document.getElementById('modal-campeon-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP ÉPICO DEL CAMPEÓN (Duración infinita)
+    const pop = document.createElement('div');
+    pop.id = 'modal-campeon-fime';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important; cursor: pointer !important;';
+    
+    pop.innerHTML = `
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 32rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">👑</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Tenemos Campeón!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Gran Monarca del Torneo</p>
+            <div style="font-size: 2rem; font-weight: 900; color: #059669; text-transform: uppercase; background: #ECFDF5; padding: 1rem; border-radius: 1rem; border: 2px solid #A7F3D0; margin-bottom: 1.5rem; letter-spacing: -0.025em;">
+                ${esc(nombreGanador)}
+            </div>
+            <p style="font-size: 0.75rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+                [ Haz clic en cualquier parte de la pantalla para cerrar ]
+            </p>
+        </div>
+    `;
+
+    setTimeout(() => {
+        document.body.appendChild(pop);
+    }, 50);
+
+    // 3. EVENTO DE CIERRE POR CLIC (De cualquier docente en la sala)
+    pop.addEventListener('click', () => {
+        pop.style.opacity = '0 !important';
+        setTimeout(() => pop.remove(), 500);
+        if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset();
+        if (window.intervaloConfetiCampeon) clearInterval(window.intervaloConfetiCampeon);
+    });
+
+    // 4. FIESTA DE CONFETI INFINITA (Hasta que cierren el modal)
+    const dispararCanonesCampeon = () => {
+        if (typeof confetti === 'undefined') return;
+        const defaults = { startVelocity: 35, spread: 360, ticks: 100, zIndex: 2147483647 }; 
+
+        if (window.intervaloConfetiCampeon) clearInterval(window.intervaloConfetiCampeon);
+
+        window.intervaloConfetiCampeon = setInterval(function() {
+            if (!document.getElementById('modal-campeon-fime')) {
+                return clearInterval(window.intervaloConfetiCampeon);
+            }
+            confetti(Object.assign({}, defaults, { particleCount: 40, origin: { x: Math.random() * 0.3 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount: 40, origin: { x: Math.random() * 0.3 + 0.6, y: Math.random() - 0.2 } }));
+        }, 300);
+    };
+
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanonesCampeon;
+        document.head.appendChild(script);
+    } else {
+        dispararCanonesCampeon();
+    }
+};
