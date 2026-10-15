@@ -22,8 +22,10 @@ let tiempoCarreras = {};
 let docentesMap = {};
 let faseInicialCompletada = false; 
 
-// 🔥 ESTADO DE VISTA PÚBLICA (Controla qué brackets está viendo el proyector)
-window.currentPublicView = 'phase1';
+// 🔥 ESTADO DE VISTA PÚBLICA CON MEMORIA ANTI-AMNESIA (Sobrevive al F5)
+window.currentPublicView = sessionStorage.getItem('vista_proyector_fime') || 'phase1';
+window.faseRegistradaComoTerminada = false;
+window.confetiLanzado = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     onSnapshot(collection(db, "competidores"), (snap) => {
@@ -58,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             renderTimeTable();
         });
-    } else {
+   } else {
         onSnapshot(doc(db, "brackets_estado", cat), (docSnap) => {
             if(!docSnap.exists()) return;
             const data = docSnap.data();
@@ -67,45 +69,143 @@ document.addEventListener('DOMContentLoaded', () => {
             tournamentData.laterRounds = data.laterRounds || [];
             tournamentData.champion = data.champion || null;
             tournamentData.byePlayer = data.byePlayer || null;
+
+            // 🔥 DETECTOR DEL GRAN CAMPEÓN
+            if (tournamentData.champion) {
+                if (!window.campeonRegistradoComoNotificado) {
+                    window.campeonRegistradoComoNotificado = true;
+                    if (typeof window.lanzarPopUpCampeon === 'function') {
+                        window.lanzarPopUpCampeon(tournamentData.champion);
+                    }
+                }
+            } else {
+                window.campeonRegistradoComoNotificado = false;
+                window.confetiCampeonLanzado = false;
+            }
             
             let r1Done = tournamentData.round1Matches.length > 0 && tournamentData.round1Matches.every(m => m.winner !== null);
             let repDone = tournamentData.repechageMatches.length === 0 || tournamentData.repechageMatches.every(m => m.winner !== null);
             
-            if (r1Done && repDone && !faseInicialCompletada) {
-                faseInicialCompletada = true;
-                lanzarPopUpFase1();
-            } else if (!r1Done || !repDone) {
-                faseInicialCompletada = false; 
-                window.currentPublicView = 'phase1'; // Regresa a Fase 1 si el admin deshace un check
+            // 🔥 GATILLO INTELIGENTE (Detecta si el admin se arrepintió en vivo)
+            if (typeof window.torneoVistoIncompleto === 'undefined') window.torneoVistoIncompleto = false;
+            let faseCompleta = r1Done && repDone;
+
+            if (!faseCompleta) {
+                window.torneoVistoIncompleto = true; // El proyector sabe que faltan combates
+                window.faseRegistradaComoTerminada = false;
+                window.confetiLanzado = false;
+                
+                // 🔥 SINCRONIZACIÓN TELEPÁTICA: Si el admin desmarca algo, forzamos el regreso a Fase 1
+                if (window.currentPublicView === 'phase2') {
+                    window.currentPublicView = 'phase1';
+                    sessionStorage.setItem('vista_proyector_fime', 'phase1');
+                }
+                
+                // Matamos zombies visuales si el admin desmarcó una casilla
+                if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
+                if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset();
+                const viejoPop = document.getElementById('modal-celebracion-fime');
+                if (viejoPop) viejoPop.remove();
+
+            } else if (faseCompleta && window.torneoVistoIncompleto) {
+                if (!window.faseRegistradaComoTerminada) {
+                    window.faseRegistradaComoTerminada = true;
+                    if (typeof window.lanzarPopUpFase1 === 'function') {
+                        window.lanzarPopUpFase1();
+                    }
+                }
             }
+
+            renderBracketsPublicos();
 
             renderBracketsPublicos();
         });
     }
 });
 
-function lanzarPopUpFase1() {
+window.lanzarPopUpFase1 = function() {
+    if (window.confetiLanzado) return;
+    window.confetiLanzado = true;
+
+    const durationMs = 15000;
+
+    // 1. Limpieza de fantasmas
+    const viejoPop = document.getElementById('modal-celebracion-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP BLINDADO
     const pop = document.createElement('div');
-    pop.className = "fixed inset-0 modal-overlay flex items-center justify-center bg-black/80";
+    pop.id = 'modal-celebracion-fime';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important;';
     pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full text-center border-t-8 border-emerald-500 modal-content">
-            <div class="text-[80px] mb-6 animate-bounce">🏆</div>
-            <h2 class="text-4xl font-black text-emerald-800 uppercase tracking-tighter mb-4">¡Fase Superada!</h2>
-            <p class="text-gray-600 font-bold text-xl uppercase tracking-widest">Las Eliminatorias han comenzado</p>
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 28rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
+            <p style="font-size: 0.75rem; color: #B45309; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF3C7; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #FDE68A; font-weight: 700;">
+                Las Eliminatorias están desbloqueadas
+            </p>
         </div>
     `;
-    document.body.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 8000); 
-}
+
+    // 🔥 EL TRUCO MAGISTRAL: Esperamos 50ms para que la pantalla termine de recargar y no nos borre el trofeo
+    setTimeout(() => {
+        document.body.appendChild(pop);
+    }, 50);
+
+    // 3. AUTO-DESTRUCCIÓN LIMPIA
+    setTimeout(() => {
+        if (pop) { 
+            pop.style.opacity = '0 !important'; 
+            setTimeout(() => pop.remove(), 500); 
+        }
+        window.confetiLanzado = false;
+        if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset(); 
+    }, durationMs);
+
+    // 4. DISPARAR CAÑONES GLOBALES
+    const dispararCanones = () => {
+        if (typeof confetti === 'undefined') return;
+        const animationEnd = Date.now() + durationMs;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2147483647 }; 
+
+        if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
+
+        window.intervaloConfeti = setInterval(function() {
+            if (Date.now() > animationEnd || !window.confetiLanzado) {
+                return clearInterval(window.intervaloConfeti);
+            }
+            const particleCount = 50 * ((animationEnd - Date.now()) / durationMs);
+            
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.7, y: Math.random() - 0.2 } }));
+        }, 250);
+    };
+
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanones;
+        document.head.appendChild(script);
+    } else {
+        dispararCanones();
+    }
+};
 
 // 🔥 FUNCIÓN PARA CAMBIAR MANUALMENTE LA VISTA DEL PROYECTOR
 window.cambiarVistaPublica = function(vista) {
     window.currentPublicView = vista;
+    sessionStorage.setItem('vista_proyector_fime', vista); // Guarda la decisión en el disco duro temporal
     renderBracketsPublicos();
 };
 
 function renderBracketsPublicos() {
     const container = document.getElementById('proyeccion-root');
+
+    // 🔥 GUARDAR SCROLL ANTES DE PINTAR
+    const areaScroll = container.querySelector('.overflow-auto');
+    const scrollTopAct = areaScroll ? areaScroll.scrollTop : 0;
+    const scrollLeftAct = areaScroll ? areaScroll.scrollLeft : 0;
     // Decide qué fase mostrar basado en el ESTADO MANUAL, no automático
     const showingPhase2 = window.currentPublicView === 'phase2';
 
@@ -114,7 +214,7 @@ function renderBracketsPublicos() {
         <div class="absolute top-4 left-8 z-50 bg-white/90 backdrop-blur px-6 py-2 rounded-full border border-gray-200 shadow-sm">
             <h1 class="text-emerald-800 font-black tracking-widest uppercase text-sm">⚔️ Torneo: ${cat}</h1>
         </div>
-        <div class="bracket-wrapper min-w-max justify-center pt-16 ${showingPhase2 ? 'phase-2-tree' : ''}">`;
+        <div class="bracket-wrapper min-w-max justify-center pt-16">`;
 
     if (!showingPhase2) {
         const r1Total = tournamentData.round1Matches.length;
@@ -173,10 +273,18 @@ function renderBracketsPublicos() {
         }
     }
 
+    // (Asegúrate de que esta sea la parte final de tu función renderBracketsPublicos)
     html += `</div></div>`;
     html += renderSidebarPuntajes();
     container.innerHTML = html;
-}
+
+    // 🔥 RESTAURAR SCROLL SIN TIMEOUT (El secreto para matar el parpadeo visual)
+    const nuevaArea = container.querySelector('.overflow-auto');
+    if (nuevaArea) {
+        nuevaArea.scrollTop = scrollTopAct;
+        nuevaArea.scrollLeft = scrollLeftAct;
+    }
+} // <--- Fin de la función
 
 function renderMatchReadonly(match, phase) {
     const renderRow = (player, isNullRow) => {
@@ -285,3 +393,69 @@ function renderTimeTable() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+
+window.lanzarPopUpCampeon = function(nombreGanador) {
+    if (window.confetiCampeonLanzado) return;
+    window.confetiCampeonLanzado = true;
+
+    // 1. Limpieza previa por si acaso
+    const viejoPop = document.getElementById('modal-campeon-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP ÉPICO DEL CAMPEÓN (Duración infinita)
+    const pop = document.createElement('div');
+    pop.id = 'modal-campeon-fime';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important; cursor: pointer !important;';
+    
+    pop.innerHTML = `
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 32rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">👑</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Tenemos Campeón!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Gran Monarca del Torneo</p>
+            <div style="font-size: 2rem; font-weight: 900; color: #059669; text-transform: uppercase; background: #ECFDF5; padding: 1rem; border-radius: 1rem; border: 2px solid #A7F3D0; margin-bottom: 1.5rem; letter-spacing: -0.025em;">
+                ${esc(nombreGanador)}
+            </div>
+            <p style="font-size: 0.75rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+                [ Haz clic en cualquier parte de la pantalla para cerrar ]
+            </p>
+        </div>
+    `;
+
+    setTimeout(() => {
+        document.body.appendChild(pop);
+    }, 50);
+
+    // 3. EVENTO DE CIERRE POR CLIC (De cualquier docente en la sala)
+    pop.addEventListener('click', () => {
+        pop.style.opacity = '0 !important';
+        setTimeout(() => pop.remove(), 500);
+        if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset();
+        if (window.intervaloConfetiCampeon) clearInterval(window.intervaloConfetiCampeon);
+    });
+
+    // 4. FIESTA DE CONFETI INFINITA (Hasta que cierren el modal)
+    const dispararCanonesCampeon = () => {
+        if (typeof confetti === 'undefined') return;
+        const defaults = { startVelocity: 35, spread: 360, ticks: 100, zIndex: 2147483647 }; 
+
+        if (window.intervaloConfetiCampeon) clearInterval(window.intervaloConfetiCampeon);
+
+        window.intervaloConfetiCampeon = setInterval(function() {
+            if (!document.getElementById('modal-campeon-fime')) {
+                return clearInterval(window.intervaloConfetiCampeon);
+            }
+            confetti(Object.assign({}, defaults, { particleCount: 40, origin: { x: Math.random() * 0.3 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount: 40, origin: { x: Math.random() * 0.3 + 0.6, y: Math.random() - 0.2 } }));
+        }, 300);
+    };
+
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanonesCampeon;
+        document.head.appendChild(script);
+    } else {
+        dispararCanonesCampeon();
+    }
+};

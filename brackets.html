@@ -51,7 +51,7 @@
             background: #047857;
         }
     </style>
-
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 
 <body
@@ -83,8 +83,9 @@
         </div>
 
         <!-- Zona Derecha: Volver al Panel y Menú Eliminatorias -->
-        <div class="w-full md:w-1/3 flex flex-col md:flex-row justify-center md:justify-end items-center md:items-center order-3 md:order-3 gap-3">
-            
+        <div
+            class="w-full md:w-1/3 flex flex-col md:flex-row justify-center md:justify-end items-center md:items-center order-3 md:order-3 gap-3">
+
             <!-- Botón Original (Panel Admin) -->
             <button id="btnReturnAdmin" onclick="salidaSeguraPanel()"
                 class="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-xs uppercase tracking-widest flex items-center gap-2">
@@ -98,11 +99,13 @@
             <!-- NUEVO: Botón Menú Eliminatorias (Oculto por defecto) -->
             <button id="btnTopMenuElim" onclick="volverMenuEliminatorias()"
                 class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-xs uppercase tracking-widest flex items-center gap-2 animate-fade-in">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg> Menú Eliminatorias
             </button>
-            
+
         </div>
 
     </header>
@@ -300,6 +303,14 @@
                             🧹 Limpiar Pista
                         </button>
                     </div>
+
+                    <!-- BOTON PARA REINICIAR TODO (SOLO SUPER ADMIN) -->
+                    <div id="contenedorResetGlobal" class="hidden mt-8 flex justify-center w-full col-span-full">
+                        <button onclick="reiniciarTorneoGlobal()"
+                            class="bg-red-600 hover:bg-red-800 text-white font-black py-4 px-8 rounded-xl shadow-2xl transition-all hover:scale-105 text-sm uppercase tracking-widest border-b-4 border-red-900 animate-pulse flex items-center gap-2">
+                            ⚠️ REINICIAR TODOS LOS TORNEOS ⚠️
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -338,6 +349,8 @@
         </p>
     </footer>
 
+
+    
 </body>
 
 </html>

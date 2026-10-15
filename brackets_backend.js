@@ -374,21 +374,7 @@ function generateInitialMatches(cat) {
     guardarBracketFirebase(cat);
 }
 
-// 🔥 NUEVO: POP-UP DE CELEBRACIÓN FASE 1
-window.lanzarPopUpFase1 = function() {
-    const pop = document.createElement('div');
-    pop.className = "fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all";
-    pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in modal-content">
-            <div class="text-6xl mb-4 animate-bounce">🎉</div>
-            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
-            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
-            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-gray-50 py-2 rounded-lg border border-gray-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
-        </div>
-    `;
-    document.body.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 10000); // Se quita solito en 10 segundos
-};
+
 
 function checkPhase1Completion(data) {
     const r1Done = data.round1Matches.every(m => m.winner !== null);
@@ -512,6 +498,15 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
         if (match.winner === null) {
             data.laterRounds = []; 
             data.champion = null;
+            
+            // 🔥 MATAMOS A LOS ZOMBIES (Liberamos CPU y RAM)
+            window.confetiLanzado = false; 
+            if (window.intervaloConfeti) clearInterval(window.intervaloConfeti); // Apaga el ciclo
+            if (typeof confetti !== 'undefined') confetti.reset(); // Destruye el motor en segundo plano
+
+            const viejoPop = document.getElementById('modal-celebracion-fime');
+            if (viejoPop) viejoPop.remove();
+            
         } else {
             checkPhase1Completion(data);
         }
@@ -1636,23 +1631,7 @@ function filtrarLobbyParaAdmins() {
 setTimeout(filtrarLobbyParaAdmins, 100);
 
 
-// 🔥 1. POP-UP INVENCIBLE EN MODO ARENA (Z-Index Extremo)
-window.lanzarPopUpFase1 = function() {
-    const pop = document.createElement('div');
-    // Le pusimos z-[999999] para asegurar que rompa la pantalla completa
-    pop.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-all";
-    pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in">
-            <div class="text-6xl mb-4 animate-bounce">🎉</div>
-            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
-            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
-            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-emerald-50 py-2 rounded-lg border border-emerald-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
-        </div>
-    `;
-    // Lo inyectamos directo en el nivel más alto
-    document.documentElement.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 10000); // 10 segundos de gloria
-};
+
 
 // 🛡️ 2. FRENO DE MANO PARA EVITAR AMNESIA DE FIREBASE
 window.salidaSeguraPanel = function() {
@@ -1670,5 +1649,183 @@ window.volverMenuEliminatorias = function() {
     const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
     if (activeView) {
         renderTournament(activeView, 'menu');
+    }
+};
+
+// ==========================================
+// 🔥 REINICIO DE TORNEO GLOBAL (SUPER ADMIN)
+// ==========================================
+
+// Mostrar el botón SOLO si es Súper Admin
+document.addEventListener('DOMContentLoaded', () => {
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    if (isSuperAdmin) {
+        const btnGlobal = document.getElementById('contenedorResetGlobal');
+        if (btnGlobal) btnGlobal.classList.remove('hidden');
+    }
+});
+
+// ==========================================
+// 🔥 REINICIO DE TORNEO GLOBAL (SUPER ADMIN)
+// ==========================================
+window.reiniciarTorneoGlobal = function() {
+    const modal = document.createElement('div');
+    modal.id = 'modal-confirm-reset-global';
+    modal.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all animate-fade-in";
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-t-8 border-red-600 transform scale-110 relative overflow-hidden">
+            <div class="text-6xl mb-4 drop-shadow-lg">⚠️</div>
+            <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter mb-2">Reinicio de Torneo</h2>
+            <p class="text-gray-600 font-bold text-sm mb-4">¿Estás seguro de reiniciar TODO el torneo?</p>
+            <p class="text-[10px] text-red-700 mt-2 mb-6 uppercase tracking-widest bg-red-50 py-3 px-4 rounded-lg border border-red-100 font-bold shadow-inner">
+                Se borrarán veredictos, tiempos y se sortearán las llaves de nuevo. <br>¡Los equipos se quedan, pero en 0 puntos!
+            </p>
+            
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('modal-confirm-reset-global').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95">
+                    Cancelar
+                </button>
+                <button id="btn-confirm-nuclear" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-red-500/30 active:scale-95 transition-all">
+                    Sí, Reiniciar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-confirm-nuclear').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-confirm-nuclear');
+        btn.innerHTML = "⏳ REINICIANDO Y SORTEANDO...";
+        btn.classList.add('animate-pulse', 'cursor-not-allowed');
+        btn.disabled = true;
+
+        try {
+            const batch = writeBatch(db);
+            
+            const snapVeredictos = await getDocs(collection(db, "veredictos"));
+            snapVeredictos.forEach(docSnap => batch.delete(docSnap.ref));
+            
+            const snapTiempos = await getDocs(collection(db, "tiempos_carreras"));
+            snapTiempos.forEach(docSnap => batch.delete(docSnap.ref));
+
+            const snapBrackets = await getDocs(collection(db, "brackets_estado"));
+            snapBrackets.forEach(docSnap => batch.delete(docSnap.ref));
+            
+            const snapEquipos = await getDocs(collection(db, "competidores"));
+            snapEquipos.forEach(docSnap => {
+                batch.update(docSnap.ref, { score: 0, puntos: 0, puntaje: 0, puntosTotales: 0 });
+            });
+            
+            const arenasTags = ["pequenos", "mediano", "grandes", "seguimiento", "evasor"];
+            for(let tag of arenasTags) {
+                batch.update(doc(db, "arenas", tag), {
+                    estado: 'inactivo', r1: '', r2: '', robot1: '', robot2: '', ganador_automatico: ''
+                });
+                localStorage.removeItem('fime_bracket_' + tag);
+            }
+
+            await batch.commit();
+
+            // 🔥 LA SOLUCIÓN: Esperamos 1.5 segundos a que Firebase recargue la lista de nombres 
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Ahora sí, hacemos el sorteo automático de los Brackets
+            const categoriasCombate = ["pequenos", "mediano", "grandes"];
+            for(let cat of categoriasCombate) {
+                if (tournamentData[cat] && tournamentData[cat].participants.length > 0) {
+                    tournamentData[cat].round1Matches = [];
+                    generateInitialMatches(cat);
+                }
+            }
+            
+            const modalContent = modal.querySelector('div');
+            modalContent.className = "bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 relative overflow-hidden";
+            modalContent.innerHTML = `
+                <div class="text-6xl mb-4 animate-bounce">✅</div>
+                <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Sorteos Listos!</h2>
+                <p class="text-gray-500 font-bold text-sm">Los torneos se limpiaron y se sortearon de nuevo automáticamente.</p>
+            `;
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+            
+        } catch (e) {
+            console.error("🔥 Error al reiniciar:", e);
+            alert("Ocurrió un error. Revisa la consola (F12).");
+            modal.remove();
+        }
+    });
+};
+
+// ========================================================
+// 🎉 SISTEMA DE CONFETI (POR ENFRENTE) Y POP-UP 
+// ========================================================
+window.lanzarPopUpFase1 = function() {
+    if (window.confetiLanzado) return;
+    window.confetiLanzado = true;
+
+    const durationMs = 15000;
+
+    // 1. Limpieza de fantasmas
+    const viejoPop = document.getElementById('modal-celebracion-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP
+    const pop = document.createElement('div');
+    pop.id = 'modal-celebracion-fime';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important;';
+    pop.innerHTML = `
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 28rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
+            <p style="font-size: 0.75rem; color: #B45309; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF3C7; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #FDE68A; font-weight: 700;">
+                Las Eliminatorias están desbloqueadas
+            </p>
+        </div>
+    `;
+    document.body.appendChild(pop);
+
+    // 3. AUTO-DESTRUCCIÓN LIMPIA
+    setTimeout(() => {
+        if (pop) { 
+            pop.style.opacity = '0 !important'; 
+            setTimeout(() => pop.remove(), 500); 
+        }
+        window.confetiLanzado = false;
+        if (typeof confetti !== 'undefined') confetti.reset(); // Apaga el motor al final
+    }, durationMs);
+
+    // 4. DISPARAR CAÑONES GLOBALES
+    const dispararCanones = () => {
+        if (typeof confetti === 'undefined') return;
+        const animationEnd = Date.now() + durationMs;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2147483647 }; 
+
+        // Limpiamos intervalos viejos por si acaso
+        if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
+
+        window.intervaloConfeti = setInterval(function() {
+            // Si se acaba el tiempo o el admin aborta la celebración, detenemos el ciclo
+            if (Date.now() > animationEnd || !window.confetiLanzado) {
+                return clearInterval(window.intervaloConfeti);
+            }
+            const particleCount = 50 * ((animationEnd - Date.now()) / durationMs);
+            
+            // Disparo global (No crashea la memoria)
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.7, y: Math.random() - 0.2 } }));
+        }, 250);
+    };
+
+    // 5. CARGAR LIBRERÍA
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanones;
+        document.head.appendChild(script);
+    } else {
+        dispararCanones();
     }
 };
