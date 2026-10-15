@@ -374,21 +374,7 @@ function generateInitialMatches(cat) {
     guardarBracketFirebase(cat);
 }
 
-// 🔥 NUEVO: POP-UP DE CELEBRACIÓN FASE 1
-window.lanzarPopUpFase1 = function() {
-    const pop = document.createElement('div');
-    pop.className = "fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all";
-    pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in modal-content">
-            <div class="text-6xl mb-4 animate-bounce">🎉</div>
-            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
-            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
-            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-gray-50 py-2 rounded-lg border border-gray-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
-        </div>
-    `;
-    document.body.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 10000); // Se quita solito en 10 segundos
-};
+
 
 function checkPhase1Completion(data) {
     const r1Done = data.round1Matches.every(m => m.winner !== null);
@@ -1636,23 +1622,7 @@ function filtrarLobbyParaAdmins() {
 setTimeout(filtrarLobbyParaAdmins, 100);
 
 
-// 🔥 1. POP-UP INVENCIBLE EN MODO ARENA (Z-Index Extremo)
-window.lanzarPopUpFase1 = function() {
-    const pop = document.createElement('div');
-    // Le pusimos z-[999999] para asegurar que rompa la pantalla completa
-    pop.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-all";
-    pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 animate-fade-in">
-            <div class="text-6xl mb-4 animate-bounce">🎉</div>
-            <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Felicidades!</h2>
-            <p class="text-gray-600 font-bold text-sm">Finalizaron con éxito la Fase Inicial.</p>
-            <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest bg-emerald-50 py-2 rounded-lg border border-emerald-100 shadow-inner">Las Eliminatorias están desbloqueadas</p>
-        </div>
-    `;
-    // Lo inyectamos directo en el nivel más alto
-    document.documentElement.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 10000); // 10 segundos de gloria
-};
+
 
 // 🛡️ 2. FRENO DE MANO PARA EVITAR AMNESIA DE FIREBASE
 window.salidaSeguraPanel = function() {
@@ -1686,59 +1656,162 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// La función de Reinicio Seguro (Conserva Equipos y Excel, pero reinicia puntajes)
-window.reiniciarTorneoGlobal = async function() {
-    const mensaje = "🚨 REINICIO DE TORNEO 🚨\n\n¿Estás seguro de reiniciar TODO el torneo?\nSe borrarán los veredictos (puntajes) y tiempos de carrera de todas las categorías.\n\n✅ ¡Tus equipos y Excel SE QUEDARÁN GUARDADOS!, pero todos regresarán a 0 puntos.\n\n¿Deseas continuar?";
-    
-    if(!confirm(mensaje)) return;
-    
-    const btn = document.querySelector('#contenedorResetGlobal button');
-    if(btn) btn.innerHTML = "⏳ REINICIANDO PUNTAJES...";
-    
-    try {
-        const batch = writeBatch(db);
-        
-        // 1. Borrar todos los Veredictos (Historial de combates)
-        const snapVeredictos = await getDocs(collection(db, "veredictos"));
-        snapVeredictos.forEach(docSnap => batch.delete(docSnap.ref));
-        
-        // 2. Borrar todos los Tiempos (Historial de carreras)
-        const snapTiempos = await getDocs(collection(db, "tiempos_carreras"));
-        snapTiempos.forEach(docSnap => batch.delete(docSnap.ref));
-        
-        // 3. 🛡️ SALVAR EQUIPOS PERO QUITARLES LOS PUNTOS 🛡️
-        const snapEquipos = await getDocs(collection(db, "competidores"));
-        snapEquipos.forEach(docSnap => {
-            // En vez de borrarlos, solo actualizamos sus puntos a cero
-            batch.update(docSnap.ref, { 
-                score: 0,
-                puntos: 0 
-            });
-        });
-        
-        // ¡NOTA! Ya NO tocamos la colección "historial_archivos". Así tus Excel se quedan ahí.
-        
-        // 4. Limpiar y apagar TODAS las Arenas
-        const arenasTags = ["pequenos", "mediano", "grandes", "seguimiento", "evasor"];
-        for(let tag of arenasTags) {
-            batch.update(doc(db, "arenas", tag), {
-                estado: 'inactivo', 
-                r1: '', r2: '', 
-                robot1: '', robot2: '', 
-                ganador_automatico: ''
-            });
-        }
+// ==========================================
+// 🔥 REINICIO DE TORNEO GLOBAL (SUPER ADMIN)
+// ==========================================
+window.reiniciarTorneoGlobal = function() {
+    const modal = document.createElement('div');
+    modal.id = 'modal-confirm-reset-global';
+    modal.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all animate-fade-in";
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-t-8 border-red-600 transform scale-110 relative overflow-hidden">
+            <div class="text-6xl mb-4 drop-shadow-lg">⚠️</div>
+            <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter mb-2">Reinicio de Torneo</h2>
+            <p class="text-gray-600 font-bold text-sm mb-4">¿Estás seguro de reiniciar TODO el torneo?</p>
+            <p class="text-[10px] text-red-700 mt-2 mb-6 uppercase tracking-widest bg-red-50 py-3 px-4 rounded-lg border border-red-100 font-bold shadow-inner">
+                Se borrarán veredictos, tiempos y se sortearán las llaves de nuevo. <br>¡Los equipos se quedan, pero en 0 puntos!
+            </p>
+            
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('modal-confirm-reset-global').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95">
+                    Cancelar
+                </button>
+                <button id="btn-confirm-nuclear" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-red-500/30 active:scale-95 transition-all">
+                    Sí, Reiniciar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
 
-        // 5. Ejecutar la magia
-        await batch.commit();
-        
-        alert("✅ ¡TORNEO REINICIADO EXITOSAMENTE!\nTodos los equipos siguen en la lista y los brackets se mezclarán solos.");
-        window.location.reload();
-        
-    } catch (e) {
-        console.error("🔥 Error en el reinicio global:", e);
-        alert("Ocurrió un error al reiniciar. Revisa la consola F12.");
-    } finally {
-        if(btn) btn.innerHTML = "⚠️ REINICIAR TODOS LOS TORNEOS ⚠️";
+    document.getElementById('btn-confirm-nuclear').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-confirm-nuclear');
+        btn.innerHTML = "⏳ REINICIANDO Y SORTEANDO...";
+        btn.classList.add('animate-pulse', 'cursor-not-allowed');
+        btn.disabled = true;
+
+        try {
+            const batch = writeBatch(db);
+            
+            const snapVeredictos = await getDocs(collection(db, "veredictos"));
+            snapVeredictos.forEach(docSnap => batch.delete(docSnap.ref));
+            
+            const snapTiempos = await getDocs(collection(db, "tiempos_carreras"));
+            snapTiempos.forEach(docSnap => batch.delete(docSnap.ref));
+
+            const snapBrackets = await getDocs(collection(db, "brackets_estado"));
+            snapBrackets.forEach(docSnap => batch.delete(docSnap.ref));
+            
+            const snapEquipos = await getDocs(collection(db, "competidores"));
+            snapEquipos.forEach(docSnap => {
+                batch.update(docSnap.ref, { score: 0, puntos: 0, puntaje: 0, puntosTotales: 0 });
+            });
+            
+            const arenasTags = ["pequenos", "mediano", "grandes", "seguimiento", "evasor"];
+            for(let tag of arenasTags) {
+                batch.update(doc(db, "arenas", tag), {
+                    estado: 'inactivo', r1: '', r2: '', robot1: '', robot2: '', ganador_automatico: ''
+                });
+                localStorage.removeItem('fime_bracket_' + tag);
+            }
+
+            await batch.commit();
+
+            // 🔥 LA SOLUCIÓN: Esperamos 1.5 segundos a que Firebase recargue la lista de nombres 
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Ahora sí, hacemos el sorteo automático de los Brackets
+            const categoriasCombate = ["pequenos", "mediano", "grandes"];
+            for(let cat of categoriasCombate) {
+                if (tournamentData[cat] && tournamentData[cat].participants.length > 0) {
+                    tournamentData[cat].round1Matches = [];
+                    generateInitialMatches(cat);
+                }
+            }
+            
+            const modalContent = modal.querySelector('div');
+            modalContent.className = "bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500 transform scale-110 relative overflow-hidden";
+            modalContent.innerHTML = `
+                <div class="text-6xl mb-4 animate-bounce">✅</div>
+                <h2 class="text-2xl font-black text-emerald-800 uppercase tracking-tighter mb-2">¡Sorteos Listos!</h2>
+                <p class="text-gray-500 font-bold text-sm">Los torneos se limpiaron y se sortearon de nuevo automáticamente.</p>
+            `;
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+            
+        } catch (e) {
+            console.error("🔥 Error al reiniciar:", e);
+            alert("Ocurrió un error. Revisa la consola (F12).");
+            modal.remove();
+        }
+    });
+};
+
+// ========================================================
+// 🎉 SISTEMA DE CONFETI (POR ENFRENTE) Y POP-UP 
+// ========================================================
+
+
+window.lanzarPopUpFase1 = function() {
+    if (window.confetiLanzado) return;
+    window.confetiLanzado = true;
+
+    const duracionSegundos = 15; 
+    const durationMs = duracionSegundos * 1000;
+    const contenedorDestino = document.fullscreenElement || document.webkitFullscreenElement || document.body;
+
+    // 1. POP-UP (Nivel 90 - Atrás del confeti)
+    const pop = document.createElement('div');
+    pop.id = 'modal-celebracion-fime';
+    pop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999990; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); transition: opacity 0.5s ease;';
+    pop.innerHTML = `
+        <div style="background: white; border-radius: 1.5rem; padding: 3rem; text-align: center; max-width: 28rem; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border-top: 8px solid #FBBF24; transform: scale(1.1);">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
+            <p style="font-size: 0.75rem; color: #B45309; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF3C7; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #FDE68A; font-weight: 700;">
+                Las Eliminatorias están desbloqueadas
+            </p>
+        </div>
+    `;
+    contenedorDestino.appendChild(pop);
+
+    // 2. LIENZO CONFETI (Nivel 99 - AL FRENTE DE TODO) 🔥
+    const canvasConfeti = document.createElement('canvas');
+    canvasConfeti.id = 'canvas-confeti-fime';
+    canvasConfeti.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 999999;'; 
+    contenedorDestino.appendChild(canvasConfeti);
+
+    // 3. AUTO-DESTRUCCIÓN
+    setTimeout(() => {
+        if (pop) { pop.style.opacity = '0'; setTimeout(() => pop.remove(), 500); }
+        if (canvasConfeti) { setTimeout(() => canvasConfeti.remove(), 500); }
+    }, durationMs);
+
+    // 4. DISPARAR CAÑONES
+    const dispararCanones = () => {
+        const miConfeti = confetti.create(canvasConfeti, { resize: true, useWorker: true });
+        const animationEnd = Date.now() + durationMs;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60 };
+
+        function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+
+        const interval = setInterval(function() {
+            if (Date.now() > animationEnd) return clearInterval(interval);
+            const particleCount = 50 * ((animationEnd - Date.now()) / durationMs);
+            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
+    };
+
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanones;
+        document.head.appendChild(script);
+    } else {
+        dispararCanones();
     }
 };

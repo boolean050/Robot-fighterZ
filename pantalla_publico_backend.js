@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             renderTimeTable();
         });
-    } else {
+   } else {
         onSnapshot(doc(db, "brackets_estado", cat), (docSnap) => {
             if(!docSnap.exists()) return;
             const data = docSnap.data();
@@ -68,15 +68,22 @@ document.addEventListener('DOMContentLoaded', () => {
             tournamentData.champion = data.champion || null;
             tournamentData.byePlayer = data.byePlayer || null;
             
+            // ... 
             let r1Done = tournamentData.round1Matches.length > 0 && tournamentData.round1Matches.every(m => m.winner !== null);
             let repDone = tournamentData.repechageMatches.length === 0 || tournamentData.repechageMatches.every(m => m.winner !== null);
             
-            if (r1Done && repDone && !faseInicialCompletada) {
-                faseInicialCompletada = true;
-                lanzarPopUpFase1();
-            } else if (!r1Done || !repDone) {
-                faseInicialCompletada = false; 
-                window.currentPublicView = 'phase1'; // Regresa a Fase 1 si el admin deshace un check
+            // 🔥 GATILLO 100% SEGURO PARA EL MODO PÚBLICO
+            if (r1Done && repDone) {
+                if (!window.faseRegistradaComoTerminada) {
+                    window.faseRegistradaComoTerminada = true;
+                    // Llamamos la función y obligamos a que se ejecute en el objeto global
+                    if (typeof window.lanzarPopUpFase1 === 'function') {
+                        window.lanzarPopUpFase1();
+                    }
+                }
+            } else {
+                window.faseRegistradaComoTerminada = false;
+                window.confetiLanzado = false; 
             }
 
             renderBracketsPublicos();
@@ -84,19 +91,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function lanzarPopUpFase1() {
+
+window.lanzarPopUpFase1 = function() {
+    if (window.confetiLanzado) return;
+    window.confetiLanzado = true;
+
+    const duracionSegundos = 15; 
+    const durationMs = duracionSegundos * 1000;
+    const contenedorDestino = document.body; // 🔥 Forzamos el body para que ignore los bloqueos de pantalla completa
+
+    // 1. EL POP-UP (Z-Index 2147483646 - Nivel altísimo)
     const pop = document.createElement('div');
-    pop.className = "fixed inset-0 modal-overlay flex items-center justify-center bg-black/80";
+    pop.id = 'modal-celebracion-fime';
+    pop.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2147483646; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); transition: opacity 0.5s ease;';
     pop.innerHTML = `
-        <div class="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full text-center border-t-8 border-emerald-500 modal-content">
-            <div class="text-[80px] mb-6 animate-bounce">🏆</div>
-            <h2 class="text-4xl font-black text-emerald-800 uppercase tracking-tighter mb-4">¡Fase Superada!</h2>
-            <p class="text-gray-600 font-bold text-xl uppercase tracking-widest">Las Eliminatorias han comenzado</p>
+        <div style="background: white; border-radius: 1.5rem; padding: 3rem; text-align: center; max-width: 28rem; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border-top: 8px solid #FBBF24; transform: scale(1.1);">
+            <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
+            <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
+            <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
+            <p style="font-size: 0.75rem; color: #B45309; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF3C7; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #FDE68A; font-weight: 700;">
+                Las Eliminatorias están desbloqueadas
+            </p>
         </div>
     `;
-    document.body.appendChild(pop);
-    setTimeout(() => { pop.remove(); }, 8000); 
-}
+    contenedorDestino.appendChild(pop);
+
+    // 2. EL LIENZO DEL CONFETI (Z-Index 2147483647 - MÁXIMO ABSOLUTO)
+    // Al ser un número más alto que el pop-up, el confeti forzosamente caerá por enfrente.
+    const canvasConfeti = document.createElement('canvas');
+    canvasConfeti.id = 'canvas-confeti-fime';
+    canvasConfeti.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647;'; 
+    contenedorDestino.appendChild(canvasConfeti);
+
+    // 3. AUTO-DESTRUCCIÓN
+    setTimeout(() => {
+        if (pop) { pop.style.opacity = '0'; setTimeout(() => pop.remove(), 500); }
+        if (canvasConfeti) { setTimeout(() => canvasConfeti.remove(), 500); }
+    }, duracionMs);
+
+    // 4. DISPARAR CAÑONES DENTRO DEL NUEVO CANVAS
+    const dispararCanones = () => {
+        const miConfeti = confetti.create(canvasConfeti, { resize: true, useWorker: true });
+        const animationEnd = Date.now() + duracionMs;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60 };
+
+        function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+
+        const interval = setInterval(function() {
+            if (Date.now() > animationEnd) return clearInterval(interval);
+            const particleCount = 50 * ((animationEnd - Date.now()) / duracionMs);
+            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
+    };
+
+    if (typeof confetti === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        script.onload = dispararCanones;
+        document.head.appendChild(script);
+    } else {
+        dispararCanones();
+    }
+};
 
 // 🔥 FUNCIÓN PARA CAMBIAR MANUALMENTE LA VISTA DEL PROYECTOR
 window.cambiarVistaPublica = function(vista) {
@@ -106,6 +163,11 @@ window.cambiarVistaPublica = function(vista) {
 
 function renderBracketsPublicos() {
     const container = document.getElementById('proyeccion-root');
+
+    // 🔥 GUARDAR SCROLL ANTES DE PINTAR
+    const areaScroll = container.querySelector('.overflow-auto');
+    const scrollTopAct = areaScroll ? areaScroll.scrollTop : 0;
+    const scrollLeftAct = areaScroll ? areaScroll.scrollLeft : 0;
     // Decide qué fase mostrar basado en el ESTADO MANUAL, no automático
     const showingPhase2 = window.currentPublicView === 'phase2';
 
@@ -176,6 +238,15 @@ function renderBracketsPublicos() {
     html += `</div></div>`;
     html += renderSidebarPuntajes();
     container.innerHTML = html;
+
+    // 🔥 RESTAURAR SCROLL DESPUÉS DE PINTAR
+    setTimeout(() => {
+        const nuevaArea = container.querySelector('.overflow-auto');
+        if (nuevaArea) {
+            nuevaArea.scrollTop = scrollTopAct;
+            nuevaArea.scrollLeft = scrollLeftAct;
+        }
+    }, 0);
 }
 
 function renderMatchReadonly(match, phase) {
