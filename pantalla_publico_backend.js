@@ -22,8 +22,10 @@ let tiempoCarreras = {};
 let docentesMap = {};
 let faseInicialCompletada = false; 
 
-// 🔥 ESTADO DE VISTA PÚBLICA (Controla qué brackets está viendo el proyector)
-window.currentPublicView = 'phase1';
+// 🔥 ESTADO DE VISTA PÚBLICA CON MEMORIA ANTI-AMNESIA (Sobrevive al F5)
+window.currentPublicView = sessionStorage.getItem('vista_proyector_fime') || 'phase1';
+window.faseRegistradaComoTerminada = false;
+window.confetiLanzado = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     onSnapshot(collection(db, "competidores"), (snap) => {
@@ -68,44 +70,62 @@ document.addEventListener('DOMContentLoaded', () => {
             tournamentData.champion = data.champion || null;
             tournamentData.byePlayer = data.byePlayer || null;
             
-            // ... 
             let r1Done = tournamentData.round1Matches.length > 0 && tournamentData.round1Matches.every(m => m.winner !== null);
             let repDone = tournamentData.repechageMatches.length === 0 || tournamentData.repechageMatches.every(m => m.winner !== null);
             
-            // 🔥 GATILLO 100% SEGURO PARA EL MODO PÚBLICO
-            if (r1Done && repDone) {
+            // 🔥 GATILLO INTELIGENTE (Detecta si el admin se arrepintió en vivo)
+            if (typeof window.torneoVistoIncompleto === 'undefined') window.torneoVistoIncompleto = false;
+            let faseCompleta = r1Done && repDone;
+
+            if (!faseCompleta) {
+                window.torneoVistoIncompleto = true; // El proyector sabe que faltan combates
+                window.faseRegistradaComoTerminada = false;
+                window.confetiLanzado = false;
+                
+                // 🔥 SINCRONIZACIÓN TELEPÁTICA: Si el admin desmarca algo, forzamos el regreso a Fase 1
+                if (window.currentPublicView === 'phase2') {
+                    window.currentPublicView = 'phase1';
+                    sessionStorage.setItem('vista_proyector_fime', 'phase1');
+                }
+                
+                // Matamos zombies visuales si el admin desmarcó una casilla
+                if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
+                if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset();
+                const viejoPop = document.getElementById('modal-celebracion-fime');
+                if (viejoPop) viejoPop.remove();
+
+            } else if (faseCompleta && window.torneoVistoIncompleto) {
                 if (!window.faseRegistradaComoTerminada) {
                     window.faseRegistradaComoTerminada = true;
-                    // Llamamos la función y obligamos a que se ejecute en el objeto global
                     if (typeof window.lanzarPopUpFase1 === 'function') {
                         window.lanzarPopUpFase1();
                     }
                 }
-            } else {
-                window.faseRegistradaComoTerminada = false;
-                window.confetiLanzado = false; 
             }
+
+            renderBracketsPublicos();
 
             renderBracketsPublicos();
         });
     }
 });
 
-
 window.lanzarPopUpFase1 = function() {
     if (window.confetiLanzado) return;
     window.confetiLanzado = true;
 
-    const duracionSegundos = 15; 
-    const durationMs = duracionSegundos * 1000;
-    const contenedorDestino = document.body; // 🔥 Forzamos el body para que ignore los bloqueos de pantalla completa
+    const durationMs = 15000;
 
-    // 1. EL POP-UP (Z-Index 2147483646 - Nivel altísimo)
+    // 1. Limpieza de fantasmas
+    const viejoPop = document.getElementById('modal-celebracion-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP BLINDADO
     const pop = document.createElement('div');
     pop.id = 'modal-celebracion-fime';
-    pop.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2147483646; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); transition: opacity 0.5s ease;';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important;';
     pop.innerHTML = `
-        <div style="background: white; border-radius: 1.5rem; padding: 3rem; text-align: center; max-width: 28rem; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border-top: 8px solid #FBBF24; transform: scale(1.1);">
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 28rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
             <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
             <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
             <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
@@ -114,34 +134,38 @@ window.lanzarPopUpFase1 = function() {
             </p>
         </div>
     `;
-    contenedorDestino.appendChild(pop);
 
-    // 2. EL LIENZO DEL CONFETI (Z-Index 2147483647 - MÁXIMO ABSOLUTO)
-    // Al ser un número más alto que el pop-up, el confeti forzosamente caerá por enfrente.
-    const canvasConfeti = document.createElement('canvas');
-    canvasConfeti.id = 'canvas-confeti-fime';
-    canvasConfeti.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647;'; 
-    contenedorDestino.appendChild(canvasConfeti);
-
-    // 3. AUTO-DESTRUCCIÓN
+    // 🔥 EL TRUCO MAGISTRAL: Esperamos 50ms para que la pantalla termine de recargar y no nos borre el trofeo
     setTimeout(() => {
-        if (pop) { pop.style.opacity = '0'; setTimeout(() => pop.remove(), 500); }
-        if (canvasConfeti) { setTimeout(() => canvasConfeti.remove(), 500); }
-    }, duracionMs);
+        document.body.appendChild(pop);
+    }, 50);
 
-    // 4. DISPARAR CAÑONES DENTRO DEL NUEVO CANVAS
+    // 3. AUTO-DESTRUCCIÓN LIMPIA
+    setTimeout(() => {
+        if (pop) { 
+            pop.style.opacity = '0 !important'; 
+            setTimeout(() => pop.remove(), 500); 
+        }
+        window.confetiLanzado = false;
+        if (typeof confetti !== 'undefined' && typeof confetti.reset === 'function') confetti.reset(); 
+    }, durationMs);
+
+    // 4. DISPARAR CAÑONES GLOBALES
     const dispararCanones = () => {
-        const miConfeti = confetti.create(canvasConfeti, { resize: true, useWorker: true });
-        const animationEnd = Date.now() + duracionMs;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60 };
+        if (typeof confetti === 'undefined') return;
+        const animationEnd = Date.now() + durationMs;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2147483647 }; 
 
-        function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+        if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
 
-        const interval = setInterval(function() {
-            if (Date.now() > animationEnd) return clearInterval(interval);
-            const particleCount = 50 * ((animationEnd - Date.now()) / duracionMs);
-            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        window.intervaloConfeti = setInterval(function() {
+            if (Date.now() > animationEnd || !window.confetiLanzado) {
+                return clearInterval(window.intervaloConfeti);
+            }
+            const particleCount = 50 * ((animationEnd - Date.now()) / durationMs);
+            
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.7, y: Math.random() - 0.2 } }));
         }, 250);
     };
 
@@ -158,6 +182,7 @@ window.lanzarPopUpFase1 = function() {
 // 🔥 FUNCIÓN PARA CAMBIAR MANUALMENTE LA VISTA DEL PROYECTOR
 window.cambiarVistaPublica = function(vista) {
     window.currentPublicView = vista;
+    sessionStorage.setItem('vista_proyector_fime', vista); // Guarda la decisión en el disco duro temporal
     renderBracketsPublicos();
 };
 
@@ -176,7 +201,7 @@ function renderBracketsPublicos() {
         <div class="absolute top-4 left-8 z-50 bg-white/90 backdrop-blur px-6 py-2 rounded-full border border-gray-200 shadow-sm">
             <h1 class="text-emerald-800 font-black tracking-widest uppercase text-sm">⚔️ Torneo: ${cat}</h1>
         </div>
-        <div class="bracket-wrapper min-w-max justify-center pt-16 ${showingPhase2 ? 'phase-2-tree' : ''}">`;
+        <div class="bracket-wrapper min-w-max justify-center pt-16">`;
 
     if (!showingPhase2) {
         const r1Total = tournamentData.round1Matches.length;
@@ -235,19 +260,18 @@ function renderBracketsPublicos() {
         }
     }
 
+    // (Asegúrate de que esta sea la parte final de tu función renderBracketsPublicos)
     html += `</div></div>`;
     html += renderSidebarPuntajes();
     container.innerHTML = html;
 
-    // 🔥 RESTAURAR SCROLL DESPUÉS DE PINTAR
-    setTimeout(() => {
-        const nuevaArea = container.querySelector('.overflow-auto');
-        if (nuevaArea) {
-            nuevaArea.scrollTop = scrollTopAct;
-            nuevaArea.scrollLeft = scrollLeftAct;
-        }
-    }, 0);
-}
+    // 🔥 RESTAURAR SCROLL SIN TIMEOUT (El secreto para matar el parpadeo visual)
+    const nuevaArea = container.querySelector('.overflow-auto');
+    if (nuevaArea) {
+        nuevaArea.scrollTop = scrollTopAct;
+        nuevaArea.scrollLeft = scrollLeftAct;
+    }
+} // <--- Fin de la función
 
 function renderMatchReadonly(match, phase) {
     const renderRow = (player, isNullRow) => {

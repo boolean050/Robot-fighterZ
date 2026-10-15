@@ -498,6 +498,15 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
         if (match.winner === null) {
             data.laterRounds = []; 
             data.champion = null;
+            
+            // 🔥 MATAMOS A LOS ZOMBIES (Liberamos CPU y RAM)
+            window.confetiLanzado = false; 
+            if (window.intervaloConfeti) clearInterval(window.intervaloConfeti); // Apaga el ciclo
+            if (typeof confetti !== 'undefined') confetti.reset(); // Destruye el motor en segundo plano
+
+            const viejoPop = document.getElementById('modal-celebracion-fime');
+            if (viejoPop) viejoPop.remove();
+            
         } else {
             checkPhase1Completion(data);
         }
@@ -1752,22 +1761,22 @@ window.reiniciarTorneoGlobal = function() {
 // ========================================================
 // 🎉 SISTEMA DE CONFETI (POR ENFRENTE) Y POP-UP 
 // ========================================================
-
-
 window.lanzarPopUpFase1 = function() {
     if (window.confetiLanzado) return;
     window.confetiLanzado = true;
 
-    const duracionSegundos = 15; 
-    const durationMs = duracionSegundos * 1000;
-    const contenedorDestino = document.fullscreenElement || document.webkitFullscreenElement || document.body;
+    const durationMs = 15000;
 
-    // 1. POP-UP (Nivel 90 - Atrás del confeti)
+    // 1. Limpieza de fantasmas
+    const viejoPop = document.getElementById('modal-celebracion-fime');
+    if (viejoPop) viejoPop.remove();
+
+    // 2. EL POP-UP
     const pop = document.createElement('div');
     pop.id = 'modal-celebracion-fime';
-    pop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999990; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); transition: opacity 0.5s ease;';
+    pop.style.cssText = 'position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483646 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(5px) !important; opacity: 1 !important; visibility: visible !important; transition: opacity 0.5s ease !important;';
     pop.innerHTML = `
-        <div style="background: white; border-radius: 1.5rem; padding: 3rem; text-align: center; max-width: 28rem; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border-top: 8px solid #FBBF24; transform: scale(1.1);">
+        <div style="background: white !important; border-radius: 1.5rem !important; padding: 3rem !important; text-align: center !important; max-width: 28rem !important; width: 100% !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; border-top: 8px solid #FBBF24 !important; transform: scale(1.1) !important;">
             <div style="font-size: 5rem; margin-bottom: 1rem; animation: bounce 1s infinite;">🏆</div>
             <h2 style="font-size: 2.25rem; font-weight: 900; color: #1F2937; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 0.5rem;">¡Felicidades!</h2>
             <p style="color: #6B7280; font-weight: 700; font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem;">Fase Inicial Superada</p>
@@ -1776,36 +1785,41 @@ window.lanzarPopUpFase1 = function() {
             </p>
         </div>
     `;
-    contenedorDestino.appendChild(pop);
+    document.body.appendChild(pop);
 
-    // 2. LIENZO CONFETI (Nivel 99 - AL FRENTE DE TODO) 🔥
-    const canvasConfeti = document.createElement('canvas');
-    canvasConfeti.id = 'canvas-confeti-fime';
-    canvasConfeti.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 999999;'; 
-    contenedorDestino.appendChild(canvasConfeti);
-
-    // 3. AUTO-DESTRUCCIÓN
+    // 3. AUTO-DESTRUCCIÓN LIMPIA
     setTimeout(() => {
-        if (pop) { pop.style.opacity = '0'; setTimeout(() => pop.remove(), 500); }
-        if (canvasConfeti) { setTimeout(() => canvasConfeti.remove(), 500); }
+        if (pop) { 
+            pop.style.opacity = '0 !important'; 
+            setTimeout(() => pop.remove(), 500); 
+        }
+        window.confetiLanzado = false;
+        if (typeof confetti !== 'undefined') confetti.reset(); // Apaga el motor al final
     }, durationMs);
 
-    // 4. DISPARAR CAÑONES
+    // 4. DISPARAR CAÑONES GLOBALES
     const dispararCanones = () => {
-        const miConfeti = confetti.create(canvasConfeti, { resize: true, useWorker: true });
+        if (typeof confetti === 'undefined') return;
         const animationEnd = Date.now() + durationMs;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60 };
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2147483647 }; 
 
-        function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+        // Limpiamos intervalos viejos por si acaso
+        if (window.intervaloConfeti) clearInterval(window.intervaloConfeti);
 
-        const interval = setInterval(function() {
-            if (Date.now() > animationEnd) return clearInterval(interval);
+        window.intervaloConfeti = setInterval(function() {
+            // Si se acaba el tiempo o el admin aborta la celebración, detenemos el ciclo
+            if (Date.now() > animationEnd || !window.confetiLanzado) {
+                return clearInterval(window.intervaloConfeti);
+            }
             const particleCount = 50 * ((animationEnd - Date.now()) / durationMs);
-            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-            miConfeti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            
+            // Disparo global (No crashea la memoria)
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.1, y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random() * 0.2 + 0.7, y: Math.random() - 0.2 } }));
         }, 250);
     };
 
+    // 5. CARGAR LIBRERÍA
     if (typeof confetti === 'undefined') {
         const script = document.createElement('script');
         script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
