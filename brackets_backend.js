@@ -77,6 +77,38 @@ const timeData = { seguimiento: [], evasor: [] };
 const timeParticipants = { seguimiento: [], evasor: [] };
 let docentesMap = {}; 
 let currentSubView = 'menu'; // 🔥 NUEVA VARIABLE PARA RECORDAR DÓNDE ESTAMOS
+
+// 🔥 NUEVA VARIABLE: Rastrea si Firebase ya nos mandó los brackets iniciales
+window.bracketsCargados = { pequenos: false, mediano: false, grandes: false };
+
+// 🔥 NUEVA FUNCIÓN: Verifica si hay nuevos equipos y auto-regenera si no ha empezado
+window.autoRegenerarBrackets = function(cat) {
+    if (!window.bracketsCargados[cat]) return; // Aún no carga de la base de datos
+    
+    const data = tournamentData[cat];
+    if (!data.participants || data.participants.length === 0) return;
+    
+    const r1Matches = data.round1Matches || [];
+    // Verificamos si ya hay un ganador (el torneo ya empezó)
+    const yaEmpezo = r1Matches.some(m => m.winner !== null) || (data.phase && data.phase !== 'phase1' && data.phase !== 'round1');
+    
+    // Calculamos cuántos robots están actualmente en los brackets
+    const enBracket = (r1Matches.length * 2) + (data.byePlayer ? 1 : 0);
+    
+    // Si NO ha empezado y la cantidad de equipos en el padrón no coincide con los del bracket
+    if (!yaEmpezo && data.participants.length !== enBracket) {
+        console.log(`🔄 Auto-regenerando brackets de ${cat} por cambio en equipos...`);
+        localStorage.removeItem('fime_bracket_' + cat);
+        generateInitialMatches(cat); // Barajea y arma los brackets nuevos
+        
+        // Actualiza visualmente si la pantalla está abierta
+        const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+        if (activeView === cat) {
+            renderTournament(cat, currentSubView);
+        }
+    }
+};
+
 window.memoriaScrollX = 0;
 window.memoriaScrollY = 0;
 window.guardarScroll = function(elemento) {
@@ -194,16 +226,20 @@ function cargarDatosDesdeServidor() {
             if (!document.querySelector('.view.active')) {
                 document.getElementById('view-menu').classList.add('active');
             }
-            if (contenedorTarjetas) contenedorTarjetas.className = "flex justify-center w-full";
+            
+            // 🔥 ARREGLO VISUAL: Convertir el Grid en Flexbox Centrado
+            if (contenedorTarjetas) contenedorTarjetas.className = "flex flex-col items-center justify-center w-full max-w-lg mx-auto";
             
             todasLasTarjetas.forEach(cat => {
-                const tarjeta = document.querySelector(`[onclick="openCategory('${cat}')"]`);
-                if (tarjeta) {
+                // Seleccionamos el div "padre" que envuelve a la tarjeta y a los controles
+                const tarjetaPadre = document.querySelector(`[onclick="openCategory('${cat}')"]`)?.parentElement;
+                
+                if (tarjetaPadre) {
                     if (cat === myViewId) {
-                        tarjeta.style.display = 'block'; 
-                        tarjeta.classList.add('w-full', 'max-w-sm'); 
+                        tarjetaPadre.style.display = 'flex'; 
+                        tarjetaPadre.classList.add('w-full', 'items-center', 'justify-center');
                     } else {
-                        tarjeta.style.display = 'none'; 
+                        tarjetaPadre.style.display = 'none'; 
                     }
                 }
             });
@@ -222,6 +258,13 @@ function cargarDatosDesdeServidor() {
                 document.getElementById('view-menu').classList.add('active');
             }
             if (contenedorTarjetas) contenedorTarjetas.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
+            
+            // 🔥 Mostrar botón de Admin Solitario
+            const btnSolitario = document.getElementById('btnModoSolitario');
+            if (btnSolitario) {
+                btnSolitario.classList.remove('hidden');
+                btnSolitario.classList.add('flex');
+            }
             
             todasLasTarjetas.forEach(cat => {
                 const tarjeta = document.querySelector(`[onclick="openCategory('${cat}')"]`);
@@ -249,6 +292,10 @@ function cargarDatosDesdeServidor() {
         if(['pequenos', 'mediano', 'grandes'].includes(activeView)) {
             renderTournament(activeView, currentSubView);
         }
+        
+        // 🔥 AUTO-REGENERAR BRACKETS SI HAY CAMBIOS DE EQUIPOS Y NO HA EMPEZADO
+        ['pequenos', 'mediano', 'grandes'].forEach(cat => window.autoRegenerarBrackets(cat));
+        
     }); // <--- 🔥 AQUÍ CERRAMOS EL RADAR DE COMPETIDORES
 
     // 🔥 SEGUNDO RADAR: BRACKETS EN TIEMPO REAL (Totalmente independiente)
@@ -272,12 +319,17 @@ function cargarDatosDesdeServidor() {
             const cat = docSnap.id;
             const data = docSnap.data();
             if (tournamentData[cat]) {
+                window.bracketsCargados[cat] = true; // 🔥 Marcamos que ya recibimos info de Firebase
+                
                 tournamentData[cat].round1Matches = data.round1Matches || [];
                 tournamentData[cat].repechageMatches = data.repechageMatches || [];
                 tournamentData[cat].laterRounds = data.laterRounds || [];
                 tournamentData[cat].champion = data.champion || null;
                 tournamentData[cat].byePlayer = data.byePlayer || null;
                 tournamentData[cat].phase = data.phase || 'round1';
+
+                // 🔥 AUTO-REGENERAR POR SI EL PADRÓN CARGÓ PRIMERO
+                window.autoRegenerarBrackets(cat);
 
                 const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
                 if (activeView === cat && typeof currentSubView !== 'undefined') {
@@ -352,23 +404,9 @@ function generateInitialMatches(cat) {
         data.round1Matches.push({ player1: shuffled[i], player2: shuffled[i + 1], winner: null });
     }
 
-    // Calcular cajas exactas de Repechaje (Perdedores R1 + El Impar)
-    const numR1 = data.round1Matches.length;
-    const totalRepPlayers = numR1 + (data.byePlayer ? 1 : 0);
-    const numRepBoxes = Math.ceil(totalRepPlayers / 2);
-
-    for (let i = 0; i < numRepBoxes; i++) {
-        data.repechageMatches.push({ player1: null, player2: null, winner: null });
-    }
-
-    // MAGIA: Sienta al Impar directamente en su lugar de Repechaje desde el inicio
+    // 🔥 NUEVA LÓGICA DE REPECHAJE: Solo 1 bracket central si es impar. 0 si es par.
     if (data.byePlayer) {
-        const byeBoxIdx = Math.floor(numR1 / 2);
-        if (numR1 % 2 === 0) {
-            data.repechageMatches[byeBoxIdx].player1 = data.byePlayer;
-        } else {
-            data.repechageMatches[byeBoxIdx].player2 = data.byePlayer;
-        }
+        data.repechageMatches.push({ player1: data.byePlayer, player2: null, winner: null });
     }
 
     guardarBracketFirebase(cat);
@@ -378,19 +416,30 @@ function generateInitialMatches(cat) {
 
 function checkPhase1Completion(data) {
     const r1Done = data.round1Matches.every(m => m.winner !== null);
-    if (!r1Done) return; 
+    
+    // 🔥 MAGIA: Asignar un perdedor aleatorio al repechaje cuando termina Ronda 1
+    if (r1Done && data.repechageMatches && data.repechageMatches.length === 1) {
+        let repMatch = data.repechageMatches[0];
+        if (!repMatch.player2) {
+            let losers = [];
+            data.round1Matches.forEach(m => {
+                if (m.winner === m.player1 && m.player2) losers.push(m.player2);
+                if (m.winner === m.player2 && m.player1) losers.push(m.player1);
+            });
+            if (losers.length > 0) {
+                // Escoger aleatorio de los que perdieron
+                repMatch.player2 = losers[Math.floor(Math.random() * losers.length)];
+            }
+        }
+    }
 
-    data.repechageMatches.forEach(m => {
-        if (m.player1 && !m.player2) m.winner = m.player1;
-        if (!m.player1 && m.player2) m.winner = m.player2;
-        if (!m.player1 && !m.player2) m.winner = 'EMPTY';
-    });
+    if (!r1Done) return; 
 
     const repDone = data.repechageMatches.every(m => m.winner !== null);
 
     if (r1Done && repDone && (!data.laterRounds || data.laterRounds.length === 0)) {
         buildPhase2Bracket(data);
-        window.lanzarPopUpFase1(); // 🔥 DISPARAMOS LA CELEBRACIÓN
+        if (typeof window.lanzarPopUpFase1 === 'function') window.lanzarPopUpFase1();
     }
 }
 
@@ -426,8 +475,10 @@ function buildPhase2Bracket(data) {
     }
 
     data.laterRounds[0].matches.forEach(m => {
-        if (m.player1 && !m.player2) { m.winner = m.player1; m.isBye = true; }
-        if (m.player2 && !m.player1) { m.winner = m.player2; m.isBye = true; }
+        // 🔥 DESACTIVADO: Ya no ganan solos ni se auto-marcan al llegar a Eliminatorias.
+        // Se quedan esperando a ser llamados por el Rayito (⚡) y evaluados manualmente.
+        if (m.player1 && !m.player2) { m.isBye = false; }
+        if (m.player2 && !m.player1) { m.isBye = false; }
     });
 
     updateLaterRoundsCascading(data);
@@ -460,8 +511,9 @@ function updateLaterRoundsCascading(data) {
 
 
 window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
-    // 🔥 MODO SOLO LECTURA: El Súper Admin no puede tocar los brackets
-    if (sessionStorage.getItem('juez_superadmin') === 'true') return;
+    // 🔥 MODO LECTURA CONDICIONAL: El Súper Admin normal no puede tocar, PERO el Solitario SÍ.
+    const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+    if (isSuperAdmin && !window.isModoSolitarioActivo) return;
 
     const data = tournamentData[cat];
     let match;
@@ -474,22 +526,11 @@ window.selectWinner = function(cat, phase, matchIdx, playerName, subView) {
 
     match.winner = match.winner === playerName ? null : playerName;
 
-    // Lógica de perdedores hacia el repechaje
-    if (phase === 'round1') {
-        const loser = match.winner === match.player1 ? match.player2 : (match.winner === match.player2 ? match.player1 : null);
-        const repMatchIdx = Math.floor(matchIdx / 2);
-        const isPlayer1 = matchIdx % 2 === 0;
-        const repMatch = data.repechageMatches[repMatchIdx];
-
-        if (repMatch) {
-            if (isPlayer1) {
-                repMatch.player1 = loser;
-                if (!loser && repMatch.winner === repMatch.player1) repMatch.winner = null;
-            } else {
-                repMatch.player2 = loser;
-                if (!loser && repMatch.winner === repMatch.player2) repMatch.winner = null;
-            }
-        }
+    // 🔥 LÓGICA DE PERDEDORES LIMPIADA
+    // Si el admin desmarca un ganador de Ronda 1 por error, borramos al oponente aleatorio del repechaje para que se vuelva a sortear
+    if (phase === 'round1' && match.winner === null && data.repechageMatches && data.repechageMatches.length === 1) {
+        data.repechageMatches[0].player2 = null;
+        data.repechageMatches[0].winner = null;
     }
 
     // 🔥 BLINDAJE ANTI-AMNESIA: Verificamos estados precisos de las fases
@@ -538,6 +579,10 @@ window.renderTournament = function renderTournament(cat, subView = null) {
     const container = document.getElementById('tournament-' + cat);
     const data = tournamentData[cat];
     if (!container) return;
+    
+    // 🔥 BLINDAJE: Saber si el usuario está viendo esta categoría en este exacto momento
+    const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+    const isVistaActiva = (activeView === cat);
 
     if (data.participants.length === 0) {
         container.innerHTML = `<div class="text-center p-12 bg-white rounded-3xl border border-gray-200 shadow-sm w-full max-w-4xl mx-auto"><span class="text-6xl block mb-4">📭</span><h3 class="text-2xl font-black text-gray-400 uppercase tracking-widest">Categoría Vacía</h3><p class="text-gray-400 font-bold mt-2">Sube tu padrón desde el Panel Admin.</p></div>`;
@@ -549,7 +594,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
     const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
 
     if (subView === 'menu') {
-        document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // Ocultar el botón superior
+        if (isVistaActiva) document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // 🔥 Solo afecta si lo estás viendo
         let html = `
         <div class="w-full max-w-4xl mx-auto mt-4 mb-8">
             <div class="text-center mb-10 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden">
@@ -664,7 +709,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 
     } else if (subView === 'phase1') {
 
-        if (!isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); // Mostrar el botón superior
+        if (isVistaActiva && !isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); // 🔥 Solo afecta si lo estás viendo
 
         html += `<div class="bracket-wrapper min-w-max justify-center">`;
         
@@ -674,12 +719,12 @@ window.renderTournament = function renderTournament(cat, subView = null) {
         const rightR1 = data.round1Matches.slice(halfR1);
 
         html += `<div class="bracket-col">
-                    <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+                    <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1 Previa</h4>`;
         leftR1.forEach((m, idx) => { html += renderMatchBox(cat, 'round1', idx, m, subView); });
         html += `</div>`;
 
         if (data.repechageMatches && data.repechageMatches.length > 0) {
-            html += `<div class="bracket-col justify-start px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8 min-h-full">
+            html += `<div class="bracket-col justify-center px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8 min-h-full">
                         <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Repechaje</h4>`;
             data.repechageMatches.forEach((m, idx) => { html += renderMatchBox(cat, 'repechage', idx, m, subView); });
             html += `</div>`;
@@ -687,7 +732,7 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 
         if (rightR1.length > 0) {
             html += `<div class="bracket-col">
-                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+                        <h4 class="absolute -top-10 left-0 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1 Previa</h4>`;
             rightR1.forEach((m, idx) => {
                 let actualIdx = halfR1 + idx;
                 html += renderMatchBox(cat, 'round1', actualIdx, m, subView);
@@ -699,10 +744,10 @@ window.renderTournament = function renderTournament(cat, subView = null) {
     
     } else if (subView === 'phase2') {
 
-        if (!isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); 
+        if (isVistaActiva && !isArena) document.getElementById('btnTopMenuElim')?.classList.remove('hidden'); // 🔥 Solo afecta si lo estás viendo
         
         html += `<div class="bracket-wrapper min-w-max justify-center">`;
-        const roundTitles = ["Ronda 2", "Octavos", "Cuartos", "Semifinal"];
+        const roundTitles = ["Ronda 1", "Octavos", "Cuartos", "Semifinal"];
         const totalRounds = data.laterRounds.length;
         
         for (let rIdx = 0; rIdx < totalRounds - 1; rIdx++) {
@@ -810,8 +855,10 @@ window.renderTournament = function renderTournament(cat, subView = null) {
 };
 
 function renderMatchBox(cat, phase, matchIdx, match, subView) {
+    // 🔥 NUEVO: Extraemos la info de la arena en vivo para esta categoría
+    const arenaEnVivo = window.arenasLiveCache ? window.arenasLiveCache[cat] : null;
+
     const renderRow = (player, isOpponentNull, isThisRowTheNullOne) => {
-        
         
         if (!player) return `
             <div class="player-row text-gray-400 bg-gray-50/50 cursor-not-allowed">
@@ -826,6 +873,22 @@ function renderMatchBox(cat, phase, matchIdx, match, subView) {
         const isLoser = match.winner !== null && match.winner !== player;
         const isImpar = (phase === 'repechage' && player === tournamentData[cat].byePlayer);
         
+        // 🔥 NUEVO: Pintar el marcador en tiempo real (incluso si es 0) SOLO en la llave activa
+        let victoriasHtml = '';
+        if (arenaEnVivo && !isWinner && !isLoser) {
+            // Verificamos que ESTA sea exactamente la pelea activa en el panel
+            const esLaPeleaActiva = (arenaEnVivo.robot1 === match.player1 && arenaEnVivo.robot2 === match.player2) || 
+                                    (arenaEnVivo.robot1 === match.player2 && arenaEnVivo.robot2 === match.player1);
+            
+            if (esLaPeleaActiva) {
+                if (arenaEnVivo.robot1 === player) {
+                    victoriasHtml = `<span class="text-emerald-600 font-black ml-1.5 text-sm drop-shadow-sm bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">${arenaEnVivo.victorias_r1 || 0}</span>`;
+                } else if (arenaEnVivo.robot2 === player) {
+                    victoriasHtml = `<span class="text-emerald-600 font-black ml-1.5 text-sm drop-shadow-sm bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">${arenaEnVivo.victorias_r2 || 0}</span>`;
+                }
+            }
+        }
+
         let rowClass = '';
         let nameColorClass = '';
         let docColorClass = '';
@@ -854,7 +917,8 @@ function renderMatchBox(cat, phase, matchIdx, match, subView) {
         return `
             <div class="player-row ${rowClass} relative" onclick="selectWinner('${cat}','${phase}',${JSON.stringify(matchIdx)},'${escAttr(player)}', '${subView}')">
                 <div class="player-info">
-                    <span class="player-name ${strikethrough} ${nameColorClass}">${esc(player)} ${tagHtml}</span>
+                    <!-- 🔥 AQUÍ SE INYECTA victoriasHtml AL LADO DEL NOMBRE -->
+                    <span class="player-name ${strikethrough} ${nameColorClass}">${esc(player)} ${victoriasHtml} ${tagHtml}</span>
                     <span class="docente-text ${docColorClass}">${esc(docentesMap[player] || 'Sin Asesor')}</span>
                 </div>
                 <span class="score-box bg-transparent border border-gray-200/50 flex items-center justify-center w-6 h-6">${icon}</span>
@@ -862,10 +926,12 @@ function renderMatchBox(cat, phase, matchIdx, match, subView) {
         `;
     };
 
-    // Detectamos si estamos en Modo Arena O si es Súper Admin
+    // Detectamos si estamos en Modo Arena O si es Súper Admin (pero respetando el Modo Solitario)
     const isArena = !!document.fullscreenElement;
     const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
-    const ocultarRayito = isArena || isSuperAdmin;
+    
+    // 🔥 EL ARREGLO: Ocultar el rayito SOLO si es Súper Admin normal (no solitario) o si está en Arena
+    const ocultarRayito = isArena || (isSuperAdmin && !window.isModoSolitarioActivo);
 
     return `
         <div class="match-container">
@@ -1364,6 +1430,32 @@ window.nuclearResetCarreras = async function(cat) {
 };
 
 
+// 🔥 MODO SOLITARIO ESTADO GLOBAL
+window.isModoSolitarioActivo = false;
+
+window.toggleModoSolitario = function() {
+    window.isModoSolitarioActivo = !window.isModoSolitarioActivo;
+    const btn = document.getElementById('btnModoSolitario');
+    
+    if (window.isModoSolitarioActivo) {
+        btn.innerHTML = "📺 Activar Admin Multi-Pantallas";
+        btn.classList.replace('bg-purple-600', 'bg-blue-600');
+        btn.classList.replace('hover:bg-purple-700', 'hover:bg-blue-700');
+    } else {
+        btn.innerHTML = "🦸‍♂️ Activar Admin Solitario";
+        btn.classList.replace('bg-blue-600', 'bg-purple-600');
+        btn.classList.replace('hover:bg-blue-700', 'hover:bg-purple-700');
+    }
+    
+    // Recargar los paneles para aplicar los nuevos permisos (Ojo de Dios -> Panel de Control)
+    inyectarOjoDeDios();
+    
+    // 🔥 MAGIA UX: Forzamos el regreso al Lobby para que el usuario vea el cambio de paneles
+    if (typeof window.goToMenu === 'function') {
+        window.goToMenu();
+    }
+};
+
 // 2. Conexión del Panel (Monitores para Súper Admin / Controles para Admin Normal)
 function inyectarOjoDeDios() {
     const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
@@ -1387,32 +1479,100 @@ function inyectarOjoDeDios() {
         if (!panel) return;
         const isCarrera = cat === 'seguimiento' || cat === 'evasor';
 
-        if (isSuperAdmin) {
-            // SÚPER ADMIN: Solo ve el panel de lectura (Monitor)
+        // 🔥 Condición de Poder: Eres Admin Normal de tu categoría OR Eres Súper Admin en Modo Solitario
+        const tienePoderes = (!isSuperAdmin && cat === miTag) || (isSuperAdmin && window.isModoSolitarioActivo);
+
+        if (isSuperAdmin && !window.isModoSolitarioActivo) {
+            // SÚPER ADMIN MULTI-PANTALLAS (Normal): Solo ve el panel de lectura (Monitor)
             panel.classList.remove('hidden');
-        } else if (cat === miTag) {
-            // ADMIN NORMAL: Convertimos el panel en sus controles de combate
+            // Restaurar aspecto de monitor visual
+            panel.className = "bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm";
+            const tituloPanelMonitor = `👁️ Monitor: ${cat}`;
+            panel.innerHTML = `
+                <h4 class="text-[10px] font-black text-amber-800 uppercase tracking-widest text-center mb-3">${tituloPanelMonitor}</h4>
+                <div class="flex items-center justify-between gap-2 mb-4">
+                    <div class="flex-1 bg-white border border-gray-200 rounded-xl p-2 text-center shadow-inner truncate">
+                        <span id="ojo-r1-${cat}" class="text-[11px] font-bold text-gray-400 uppercase">-- Esperando --</span>
+                    </div>
+                    ${(cat === 'seguimiento' || cat === 'evasor') ? '' : `<span class="text-[10px] font-black text-red-600 uppercase">VS</span>
+                    <div class="flex-1 bg-white border border-gray-200 rounded-xl p-2 text-center shadow-inner truncate">
+                        <span id="ojo-r2-${cat}" class="text-[11px] font-bold text-gray-400 uppercase">-- Esperando --</span>
+                    </div>`}
+                </div>
+                <button onclick="limpiarArenaLocal('${cat}')" class="w-full bg-slate-600 hover:bg-slate-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-md">
+                    🧹 Limpiar ${cat === 'seguimiento' || cat === 'evasor' ? 'Pista' : 'Arena'}
+                </button>
+            `;
+            
+        } else if (tienePoderes) {
+            // ADMIN NORMAL O SUPER ADMIN SOLITARIO: Convertimos el panel en sus controles
             panel.classList.remove('hidden');
-            panel.className = "bg-emerald-50 border-2 border-emerald-600 rounded-2xl p-4 shadow-sm w-full transition-all animate-fade-in";
+            
+            // 🔥 ARREGLO VISUAL: Dejar que el panel inferior ocupe el espacio que necesita sin encimarse
+            panel.className = "bg-emerald-50 border-2 border-emerald-600 rounded-2xl p-4 shadow-sm w-full transition-all animate-fade-in mt-4";
+            
+            // IMPORTANTE: También debemos arreglar la tarjeta blanca "padre" para que no limite la altura
+            const tarjetaBlanca = panel.previousElementSibling;
+            if (tarjetaBlanca) {
+                tarjetaBlanca.classList.remove('h-full');
+            }
+
             const tituloPanel = isCarrera ? '🏎️ Control de Pista' : '🥊 Control de Arena';
             
-            // Inyectamos los botones y selectores
+            // Inyectamos los botones y selectores con llamadas directas y seguras
             panel.innerHTML = `
                 <h4 class="text-[10px] font-black uppercase tracking-wider text-emerald-800 mb-3 flex items-center justify-center">${tituloPanel}</h4>
-                <div class="flex gap-2 mb-3">
-                    <select id="sa-r1-${cat}" class="${isCarrera ? 'w-full' : 'w-1/2'} p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-emerald-500 transition-all">
+                
+                ${isCarrera ? '' : `
+                <!-- NUEVOS CONTROLES DE RONDA Y TIEMPO -->
+                <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm mb-3">
+                    <div class="flex flex-col w-1/2 border-r border-gray-100 pr-2">
+                        <span class="text-[8px] font-bold text-gray-400 uppercase">Tiempo:</span>
+                        <select id="sa-tiempo-${cat}" class="text-[10px] font-black text-emerald-700 bg-transparent focus:outline-none cursor-pointer">
+                            <option value="60">1 Minuto</option>
+                            <option value="180">3 Minutos</option>
+                            <option value="300">5 Minutos</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col w-1/2 pl-2">
+                        <span class="text-[8px] font-bold text-gray-400 uppercase">Round:</span>
+                        <select id="sa-ronda-${cat}" class="text-[10px] font-black text-emerald-700 bg-transparent focus:outline-none cursor-pointer">
+                            <option value="1">Round 1</option>
+                            <option value="2">Round 2</option>
+                            <option value="3">Round 3 (Desempate)</option>
+                        </select>
+                    </div>
+                </div>`}
+
+                <div class="flex gap-2 mb-3 items-center">
+                    <select id="sa-r1-${cat}" class="${isCarrera ? 'w-full' : 'w-[45%]'} p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-blue-500 transition-all">
                         <option value="">-- ESPERANDO R1 --</option>
                     </select>
                     ${isCarrera ? '' : `
-                    <span class="text-xs font-black text-red-500 self-center">VS</span>
-                    <select id="sa-r2-${cat}" class="w-1/2 p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-emerald-500 transition-all">
+                    <div class="flex flex-col w-[10%] items-center justify-center">
+                        <span class="text-[8px] font-black text-gray-400 mb-0.5">WINS</span>
+                        <div class="flex gap-1 text-sm font-black bg-gray-100 px-2 py-1 rounded-md shadow-inner">
+                            <span id="sa-v1-${cat}" class="text-blue-600">0</span>
+                            <span class="text-gray-300">-</span>
+                            <span id="sa-v2-${cat}" class="text-orange-500">0</span>
+                        </div>
+                    </div>
+                    <select id="sa-r2-${cat}" class="w-[45%] p-2 bg-white border border-gray-200 text-gray-800 font-black uppercase rounded-xl text-center shadow-sm text-[10px] focus:outline-none focus:border-orange-500 transition-all">
                         <option value="">-- ESPERANDO R2 --</option>
                     </select>`}
                 </div>
-                <div class="flex gap-2">
-                    <button id="sa-btn-iniciar-${cat}" onclick="saAccionArena('${cat}', 'iniciar')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">Iniciar</button>
-                    <button onclick="saAccionArena('${cat}', 'ko')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">${isCarrera ? '🏁 Fin' : '🥊 K.O.'}</button>
-                    <button onclick="saAccionArena('${cat}', 'limpiar')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
+                <div class="flex flex-wrap gap-2">
+                    <button id="sa-btn-iniciar-${cat}" onclick="window.saAccionArena('${cat}', 'iniciar')" class="flex-1 min-w-[30%] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">Iniciar</button>
+                    <button onclick="window.saAccionArena('${cat}', 'ko')" class="flex-1 min-w-[25%] bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">${isCarrera ? '🏁 Fin' : '🥊 K.O.'}</button>
+                    <button onclick="window.saAccionArena('${cat}', 'limpiar')" class="flex-1 min-w-[30%] bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95">🧹 Limpiar</button>
+                    ${isCarrera ? '' : `
+                    <button onclick="window.saAccionArena('${cat}', 'reset_victorias')" class="w-full mt-1 bg-slate-500 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-[10px] uppercase tracking-widest shadow-sm transition-all active:scale-95 flex justify-center items-center gap-2">
+                        🔄 Reiniciar Marcador a 0 - 0
+                    </button>
+                    <!-- 🔥 EL NUEVO BOTÓN TODO-EN-UNO -->
+                    <button onclick="window.abrirBotoneraJuez('${cat}')" class="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg text-[11px] uppercase tracking-widest shadow-lg transition-all active:scale-95 flex justify-center items-center gap-2">
+                        📱 ABRIR MI BOTONERA DE JUEZ
+                    </button>`}
                 </div>
             `;
         }
@@ -1423,8 +1583,17 @@ function inyectarOjoDeDios() {
                 if(!docSnap.exists()) return;
                 const data = docSnap.data();
                 
-                if (isSuperAdmin) {
-                    // Actualiza solo etiquetas (Labels) para el Súper Admin
+                // 🔥 NUEVO: Guardar estado en vivo y refrescar el bracket
+                window.arenasLiveCache = window.arenasLiveCache || {};
+                window.arenasLiveCache[cat] = data;
+                
+                const activeView = document.querySelector('.view.active')?.id.replace('view-', '');
+                if (activeView === cat && typeof currentSubView !== 'undefined') {
+                    renderTournament(cat, currentSubView);
+                }
+
+                if (isSuperAdmin && !window.isModoSolitarioActivo) {
+                    // Actualiza solo etiquetas (Labels) para el Súper Admin Multi-Pantallas
                     const labelR1 = document.getElementById(`ojo-r1-${cat}`);
                     const labelR2 = document.getElementById(`ojo-r2-${cat}`);
                     
@@ -1450,10 +1619,28 @@ function inyectarOjoDeDios() {
                     // Actualiza selectores y bloquea/desbloquea botones para el Admin Normal
                     const selR1 = document.getElementById(`sa-r1-${cat}`);
                     const selR2 = document.getElementById(`sa-r2-${cat}`);
+                    const selTiempo = document.getElementById(`sa-tiempo-${cat}`);
+                    const selRonda = document.getElementById(`sa-ronda-${cat}`);
                     const btnIniciar = document.getElementById(`sa-btn-iniciar-${cat}`);
                     
-                    if(selR1 && data.robot1) selR1.value = data.robot1;
-                    if(selR2 && data.robot2) selR2.value = data.robot2;
+                    // 🔥 MAGIA DE MEMORIA: Leemos y fijamos los robots
+                    if(selR1) {
+                        if (data.robot1) selR1.value = data.robot1;
+                        else selR1.value = ""; // Si el admin usó "🧹 Limpiar", lo regresamos a ESPERANDO
+                    }
+                    if(selR2) {
+                        if (data.robot2) selR2.value = data.robot2;
+                        else selR2.value = "";
+                    }
+                    
+                    if(selTiempo && data.tiempo_ronda) selTiempo.value = data.tiempo_ronda;
+                    if(selRonda && data.ronda_actual) selRonda.value = data.ronda_actual;
+                    
+                    // 🔥 ACTUALIZAR MARCADOR VISUAL
+                    const mk1 = document.getElementById(`sa-v1-${cat}`);
+                    const mk2 = document.getElementById(`sa-v2-${cat}`);
+                    if(mk1) mk1.innerText = data.victorias_r1 || 0;
+                    if(mk2) mk2.innerText = data.victorias_r2 || 0;
                     
                     if(btnIniciar) {
                         if (data.estado === 'peleando') {
@@ -1464,10 +1651,7 @@ function inyectarOjoDeDios() {
                             btnIniciar.className = "flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95";
                             btnIniciar.innerHTML = "Iniciar";
                             btnIniciar.disabled = false;
-                            if(data.estado === 'inactivo') {
-                                if(selR1) selR1.value = '';
-                                if(selR2) selR2.value = '';
-                            }
+                            // ❌ FUERA: Ya no vaciamos los campos mágicamente al estar inactivo
                         }
                     }
                 }
@@ -1512,76 +1696,134 @@ function inyectarOjoDeDios() {
         }
     });
 
-    // Restauramos el llenado de los selectores (Solo para el Admin Normal)
-    if (!isSuperAdmin && miTag) {
+    // Restauramos el llenado de los selectores (Para Admin Normal O SuperAdmin Solitario)
+    if ((!isSuperAdmin && miTag) || (isSuperAdmin && window.isModoSolitarioActivo)) {
         onSnapshot(collection(db, "competidores"), (snap) => {
             let comp = [];
             snap.forEach(doc => comp.push(doc.data()));
             
-            const selR1 = document.getElementById(`sa-r1-${miTag}`);
-            const selR2 = document.getElementById(`sa-r2-${miTag}`);
-            if(!selR1) return;
+            // Si es súper admin solitario, llenamos TODOS los selectores. Si es normal, solo el suyo.
+            const categoriasALlenar = isSuperAdmin ? ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'] : [miTag];
             
-            const currentR1 = selR1.value;
-            const currentR2 = selR2 ? selR2.value : '';
-            
-            let opts = `<option value="">-- ESPERANDO --</option>`;
-            comp.filter(c => {
-                let cTag = c.categoria_tag || '';
-                let cOrig = (c.categoria_original || '').toLowerCase();
-                return cTag === miTag || cOrig.includes(miTag.substring(0,4));
-            }).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
-                opts += `<option value="${c.nombre}">${c.nombre}</option>`;
+            categoriasALlenar.forEach(catLoop => {
+                const selR1 = document.getElementById(`sa-r1-${catLoop}`);
+                const selR2 = document.getElementById(`sa-r2-${catLoop}`);
+                if(!selR1) return;
+                
+                const currentR1 = selR1.value;
+                const currentR2 = selR2 ? selR2.value : '';
+                
+                let opts = `<option value="">-- ESPERANDO --</option>`;
+                comp.filter(c => {
+                    let cTag = c.categoria_tag || '';
+                    let cOrig = (c.categoria_original || '').toLowerCase();
+                    return cTag === catLoop || cOrig.includes(catLoop.substring(0,4));
+                }).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
+                    opts += `<option value="${c.nombre}">${c.nombre}</option>`;
+                });
+                
+                selR1.innerHTML = opts;
+                if(selR2) selR2.innerHTML = opts;
+                
+                selR1.value = currentR1;
+                if(selR2) selR2.value = currentR2;
             });
-            
-            selR1.innerHTML = opts;
-            if(selR2) selR2.innerHTML = opts;
-            
-            selR1.value = currentR1;
-            if(selR2) selR2.value = currentR2;
         });
     }
-}
+} // <--- 🔥 ESTA LLAVE CIERRA inyectarOjoDeDios() CORRECTAMENTE
 
-// 3. Restauramos las Funciones de Control (Iniciar, K.O., Limpiar)
+// 3. Restauramos las Funciones de Control (Iniciar, K.O., Limpiar, Reglas)
 window.saAccionArena = async function(cat, accion) {
     const arenaRef = doc(db, "arenas", cat);
+    const isCarrera = cat === 'seguimiento' || cat === 'evasor';
     
     if (accion === 'limpiar') {
         if(!confirm(`🧹 ¿Limpiar arena de ${cat.toUpperCase()}?`)) return;
-        await setDoc(arenaRef, { robot1: '', robot2: '', estado: 'inactivo' });
+        await setDoc(arenaRef, { robot1: '', robot2: '', estado: 'inactivo' }, { merge: true });
+        const selR1 = document.getElementById(`sa-r1-${cat}`);
+        const selR2 = document.getElementById(`sa-r2-${cat}`);
+        if (selR1) selR1.value = '';
+        if (selR2) selR2.value = '';
     } 
     else if (accion === 'ko') {
-        const isCarrera = cat === 'seguimiento' || cat === 'evasor';
         if(!confirm(isCarrera ? '🏁 ¿Forzar fin de carrera?' : '🥊 ¿Declarar K.O.?')) return;
         await updateDoc(arenaRef, { estado: 'ko' });
+    }
+    else if (accion === 'reset_victorias') {
+        if(!confirm("🔄 ¿Deseas reiniciar el marcador de victorias a 0 - 0 y regresar la categoría al Round 1?")) return;
+        await setDoc(arenaRef, { 
+            victorias_r1: 0, 
+            victorias_r2: 0, 
+            ronda_actual: 1 
+        }, { merge: true });
     }
     else if (accion === 'iniciar') {
         const r1 = document.getElementById(`sa-r1-${cat}`).value;
         const r2 = document.getElementById(`sa-r2-${cat}`) ? document.getElementById(`sa-r2-${cat}`).value : '';
-        const isCarrera = cat === 'seguimiento' || cat === 'evasor';
+        
+        const tiempoInput = document.getElementById(`sa-tiempo-${cat}`);
+        const rondaInput = document.getElementById(`sa-ronda-${cat}`);
+        
+        const tiempoRound = isCarrera ? 300 : (tiempoInput ? parseInt(tiempoInput.value) : 60);
+        const numeroRonda = isCarrera ? 1 : (rondaInput ? parseInt(rondaInput.value) : 1);
         
         if (isCarrera) {
-            if (!r1) return alert("Selecciona un robot.");
+            if (!r1) return window.mostrarAvisoAdmin("Faltan Datos", "Por favor selecciona un robot para iniciar la pista.", "error");
         } else {
-            if (!r1 || !r2) return alert("Selecciona ambos robots.");
-            if (r1 === r2) return alert("Mismo robot.");
+            if (!r1 || !r2) return window.mostrarAvisoAdmin("Faltan Datos", "Por favor selecciona a ambos robots para la batalla.", "error");
+            if (r1 === r2) return window.mostrarAvisoAdmin("Error de Selección", "No puedes enfrentar al mismo robot consigo mismo.", "error");
+            
+            // 🔥 LÓGICA INTELIGENTE DE RONDAS
+            const v1Node = document.getElementById(`sa-v1-${cat}`);
+            const v2Node = document.getElementById(`sa-v2-${cat}`);
+            const currentV1 = v1Node ? parseInt(v1Node.innerText) : 0;
+            const currentV2 = v2Node ? parseInt(v2Node.innerText) : 0;
+            
+            // Regla A: Advertencia inteligente si están 0-0 y avanzan de ronda (Por Empate)
+            if (currentV1 === 0 && currentV2 === 0 && numeroRonda > 1) {
+                if(!confirm("⚠️ El marcador está 0 - 0 pero intentas iniciar una ronda avanzada.\n\n¿Hubo un EMPATE TÉCNICO previo y deseas continuar?")) {
+                    if(rondaInput) rondaInput.value = "1";
+                    return;
+                }
+            }
+            
+            // Regla B: Si ya llevan puntos y le pican al "Round 1", les advertimos de que se va a resetear.
+            if ((currentV1 > 0 || currentV2 > 0) && numeroRonda === 1) {
+                if(!confirm(`⚠️ ¡ATENCIÓN!\nEl marcador actual es ${currentV1} - ${currentV2}.\nSi inicias una pelea en el ROUND 1, el marcador se reiniciará a 0 - 0.\n\n¿Estás seguro de reiniciar los puntajes y empezar de cero?`)) {
+                    // Revertimos el selector visual a la ronda correcta si cancelan
+                    if(rondaInput) rondaInput.value = (currentV1 + currentV2 + 1).toString();
+                    return;
+                }
+            }
         }
         
-        await setDoc(arenaRef, { 
+        let payloadInicio = { 
             robot1: r1, 
             robot2: isCarrera ? '' : r2, 
             estado: 'peleando',
-            tiempo_inicio: Date.now() / 1000 
-        });
+            tiempo_inicio: Date.now() / 1000,
+            tiempo_ronda: tiempoRound,
+            ronda_actual: numeroRonda,
+            // 🔥 NUEVO: Limpiamos la urna de votos para el nuevo round
+            votos_r1: 0,
+            votos_r2: 0,
+            jueces_votaron: [] 
+        };
+        
+        // Si inician forzosamente en Round 1, ejecutamos el reseteo del marcador en la base de datos
+        if (numeroRonda === 1 && !isCarrera) {
+            payloadInicio.victorias_r1 = 0;
+            payloadInicio.victorias_r2 = 0;
+        }
+        
+        await setDoc(arenaRef, payloadInicio, { merge: true });
     }
 };
 
-
-// 3. Funciones de Control Override (Solo queda Limpiar)
+// 4. Funciones de Control Override (Solo queda Limpiar)
 window.limpiarArenaLocal = async function(cat) {
     if(!confirm(`🧹 ¿Forzar la limpieza de la arena de ${cat.toUpperCase()}?`)) return;
-    await setDoc(doc(db, "arenas", cat), { robot1: '', robot2: '', estado: 'inactivo' });
+    await setDoc(doc(db, "arenas", cat), { robot1: '', robot2: '', estado: 'inactivo' }, { merge: true });
 };
 
 // Arrancamos los motores al cargar el script
@@ -1828,4 +2070,62 @@ window.lanzarPopUpFase1 = function() {
     } else {
         dispararCanones();
     }
+};
+
+
+// --- BOTONERA DE JUEZ INTEGRADA (TODO EN UNO) ---
+window.abrirBotoneraJuez = function(cat) {
+    const viejo = document.getElementById('modal-botonera-juez');
+    if (viejo) viejo.remove();
+
+    const m = document.createElement('div');
+    m.id = 'modal-botonera-juez';
+    // Se sobrepone a todo (z-[999999]), fondo oscuro, ocupa el 100% de la pantalla
+    m.className = "fixed inset-0 z-[999999] flex flex-col bg-gray-900 animate-fade-in";
+    m.innerHTML = `
+        <div class="bg-gray-800 flex justify-between items-center p-3 shadow-md z-10">
+            <span class="text-white font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Juez Activo
+            </span>
+            <button onclick="document.getElementById('modal-botonera-juez').remove()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest shadow-md transition-colors active:scale-95">
+                ❌ Cerrar Botonera
+            </button>
+        </div>
+        <!-- Inyectamos index.html con un parámetro secreto -->
+        <iframe src="index.html?modo=juez" class="flex-grow w-full border-none bg-gray-50"></iframe>
+    `;
+    document.body.appendChild(m);
+};
+
+
+
+// --- MODAL ELEGANTE PARA EL ADMIN ---
+window.mostrarAvisoAdmin = function(titulo, texto, tipo = 'info') {
+    const viejo = document.getElementById('modal-aviso-admin');
+    if (viejo) viejo.remove();
+
+    let icono = '⚠️';
+    let colorBorde = 'border-amber-500';
+    let colorBoton = 'bg-amber-500 hover:bg-amber-600';
+    
+    if (tipo === 'error') {
+        icono = '❌'; colorBorde = 'border-red-500'; colorBoton = 'bg-red-600 hover:bg-red-700';
+    } else if (tipo === 'success') {
+        icono = '✅'; colorBorde = 'border-emerald-500'; colorBoton = 'bg-emerald-600 hover:bg-emerald-700';
+    }
+
+    const m = document.createElement('div');
+    m.id = 'modal-aviso-admin';
+    m.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in px-4";
+    m.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 ${colorBorde} transform scale-110">
+            <div class="text-5xl mb-4 drop-shadow-sm">${icono}</div>
+            <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight mb-2">${titulo}</h2>
+            <p class="text-gray-600 font-bold text-xs mb-8 whitespace-pre-line leading-relaxed">${texto}</p>
+            <button onclick="document.getElementById('modal-aviso-admin').remove()" class="${colorBoton} text-white font-black py-4 px-6 rounded-xl w-full text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                Entendido
+            </button>
+        </div>
+    `;
+    document.body.appendChild(m);
 };

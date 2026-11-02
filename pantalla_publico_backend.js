@@ -222,23 +222,23 @@ function renderBracketsPublicos() {
         const leftR1 = tournamentData.round1Matches.slice(0, halfR1);
         const rightR1 = tournamentData.round1Matches.slice(halfR1);
 
-        html += `<div class="bracket-col"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+        html += `<div class="bracket-col"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1 Previa</h4>`;
         leftR1.forEach(m => { html += renderMatchReadonly(m, 'round1'); });
         html += `</div>`;
 
         if (tournamentData.repechageMatches.length > 0) {
-            html += `<div class="bracket-col px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Repechaje</h4>`;
+            html += `<div class="bracket-col justify-center min-h-full px-8 mx-4 border-x-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl pb-8"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Repechaje</h4>`;
             tournamentData.repechageMatches.forEach(m => { html += renderMatchReadonly(m, 'repechage'); });
             html += `</div>`;
         }
 
         if (rightR1.length > 0) {
-            html += `<div class="bracket-col"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1</h4>`;
+            html += `<div class="bracket-col"><h4 class="absolute -top-10 w-full text-center text-[11px] font-black text-emerald-800 uppercase tracking-widest border-b-2 border-emerald-100 pb-2">Ronda 1 Previa</h4>`;
             rightR1.forEach(m => { html += renderMatchReadonly(m, 'round1'); });
             html += `</div>`;
         }
     } else {
-        const roundTitles = ["Ronda 2", "Octavos", "Cuartos", "Semifinal"];
+        const roundTitles = ["Ronda 1", "Octavos", "Cuartos", "Semifinal"];
         const totalRounds = tournamentData.laterRounds.length;
         
         for (let rIdx = 0; rIdx < totalRounds - 1; rIdx++) {

@@ -211,10 +211,10 @@
     
     <!--Reloj-->
     <div class="bg-red-50 border-2 border-red-200 rounded-xl p-3 flex justify-between items-center shadow-inner">
-        <span class="text-xs font-black text-red-800 uppercase tracking-widest flex items-center gap-2">
+        <span id="lbl-ronda-juez" class="text-[10px] font-black text-red-800 uppercase tracking-widest flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span> EN VIVO
         </span>
-        <span id="cronometro-juez" class="text-3xl font-mono font-black text-red-600 tracking-wider">05:00</span>
+        <span id="cronometro-juez" class="text-3xl font-mono font-black text-red-600 tracking-wider">00:00</span>
     </div>
 
     <!--Barra VS-->
@@ -235,22 +235,16 @@
             <!-- Lado Izquierdo: Robot 1 -->
             <div class="flex flex-col items-center gap-3 border-r border-gray-200 pr-2">
                 <span class="text-sm font-black text-blue-900 uppercase mb-1 text-center h-8 flex items-center justify-center" id="btn-lbl-r1">R1</span>
-                <button id="btn-dec-r1-golpes" onclick="window.enviarVeredictoFinal('r1', 'golpes')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
-                    🏆 GOLPES (+3)
-                </button>
-                <button id="btn-dec-r1-ko" onclick="window.enviarVeredictoFinal('r1', 'ko')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
-                    ☠️ K.O. (+5)
+                <button id="btn-dec-r1-vencedor" onclick="window.enviarVeredictoFinal('r1', 'vencedor')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm select-none">
+                    🏆 VENCEDOR (+3)
                 </button>
             </div>
             
             <!-- Lado Derecho: Robot 2 -->
             <div class="flex flex-col items-center gap-3 pl-2">
                 <span class="text-sm font-black text-orange-900 uppercase mb-1 text-center h-8 flex items-center justify-center" id="btn-lbl-r2">R2</span>
-                <button id="btn-dec-r2-golpes" onclick="window.enviarVeredictoFinal('r2', 'golpes')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
-                    🏆 GOLPES (+3)
-                </button>
-                <button id="btn-dec-r2-ko" onclick="window.enviarVeredictoFinal('r2', 'ko')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm">
-                    ☠️ K.O. (+5)
+                <button id="btn-dec-r2-vencedor" onclick="window.enviarVeredictoFinal('r2', 'vencedor')" class="w-full bg-gray-200 text-gray-500 font-black py-4 rounded-xl text-[13px] uppercase tracking-widest cursor-not-allowed border-b-4 border-gray-300 transition-all text-center shadow-sm select-none">
+                    🏆 VENCEDOR (+3)
                 </button>
             </div>
         </div>
@@ -322,6 +316,7 @@
                     <table class="min-w-full divide-y divide-gray-200 text-[10px]">
                         <thead class="bg-emerald-100 font-bold uppercase text-emerald-800 sticky top-0">
                             <tr>
+                                <th class="px-2 py-1 text-left">ID</th>
                                 <th class="px-2 py-1 text-left">ALIAS DEL EQUIPO</th>
                                 <th class="px-2 py-1 text-left">CATEGORÍA</th>
                                 <th class="px-2 py-1 text-left">FACULTAD</th>
