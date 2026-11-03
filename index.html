@@ -387,6 +387,29 @@
                 </div>
             </div>
 
+            <!-- 3.3 TABLA: JUECES DE DISEÑO (NUEVO) -->
+            <div id="contenedorJuecesDiseno" class="bg-amber-50 rounded-xl border border-amber-200 text-left p-3 mb-4 hidden">
+                <div class="flex justify-between items-center mb-2 border-b border-amber-200 pb-1">
+                    <h4 class="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                        ✍️ Evaluadores de Diseño
+                    </h4>
+                    <button onclick="abrirModalAsignarDiseno()" class="bg-amber-500 text-white hover:bg-amber-600 px-2 py-1 rounded font-bold text-[9px] transition-all shadow-sm">
+                        + Asignar Permiso
+                    </button>
+                </div>
+                <div class="overflow-x-auto max-h-32 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-amber-200 text-[10px]">
+                        <thead class="bg-amber-100 font-bold uppercase text-amber-800">
+                            <tr>
+                                <th class="px-1 py-1 text-left">DOCENTE</th>
+                                <th class="px-1 py-1 text-center">STATUS</th>
+                                <th class="px-1 py-1 text-center">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaJuecesDisenoBody" class="divide-y divide-amber-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
 
             <!-- GENERADOR DE QR -->
             <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 shadow-sm text-center">
@@ -534,6 +557,27 @@
         </div>
     </div>
 
+    <!-- MODAL ASIGNAR JUEZ DE DISEÑO (NUEVO) -->
+    <div id="modalAsignarDiseno" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs border-2 border-amber-500 transform scale-100">
+            <h3 class="text-lg font-black text-amber-600 mb-1 uppercase tracking-wide">Asignar Evaluador</h3>
+            <p class="text-[10px] text-gray-500 font-bold mb-4">Selecciona un docente/admin para darle permisos de Evaluación de Diseño:</p>
+
+            <div class="space-y-4 mb-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Lista de Docentes</label>
+                    <select id="selectJuezDiseno" class="w-full p-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold focus:outline-none focus:border-amber-500 transition-all cursor-pointer">
+                        <option value="" disabled selected>-- Elige un docente --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="cerrarModalAsignarDiseno()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all">Cancelar</button>
+                <button onclick="guardarAsignacionDiseno()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-amber-500/30">Asignar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL CONFIRMAR VEREDICTO UNIVERSAL -->
 <div id="modalConfirmarVeredicto" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all opacity-0 scale-95 data-[show=true]:opacity-100 data-[show=true]:scale-100">

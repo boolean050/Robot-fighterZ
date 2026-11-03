@@ -53,12 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Si ya es admin guardado
     else if (isAdmin) {
         const isJuezForzado = urlParams.get('modo') === 'juez';
+        const catForzada = urlParams.get('catForzada');
         
         if (isJuezForzado) {
+            // 🔥 TRUCO SUPERADMIN: Le forzamos temporalmente la categoría que viene en la URL
+            if (catForzada) {
+                sessionStorage.setItem('juez_categoria', catForzada);
+                currentCategory = catForzada;
+            }
+
             // 🔥 MODO TODO-EN-UNO: El admin abrió su iframe de juez flotante
             mostrarPantalla('pantallaEspera');
             document.getElementById('nombreAsignado').textContent = currentUser;
-            document.getElementById('categoriaAsignada').textContent = currentCategory;
+            document.getElementById('categoriaAsignada').textContent = currentCategory || 'SIN ASIGNAR';
             iniciarRadarArena();
             // No prendemos el radar de sesión aquí para no chocar con el de la ventana de fondo
             
@@ -383,10 +390,22 @@ window.cargarDatosAdmin = function() {
     onSnapshot(collection(db, "maestros_autorizados"), (snapshot) => {
         const tbodyJueces = document.getElementById('tablaJuecesBody');
         const tbodyAdmins = document.getElementById('tablaAdminsBody');
+        const tbodyDiseno = document.getElementById('tablaJuecesDisenoBody');
+        const selectDiseno = document.getElementById('selectJuezDiseno');
+        
         if(!tbodyJueces || !tbodyAdmins) return;
         
         tbodyJueces.innerHTML = '';
         tbodyAdmins.innerHTML = '';
+        if(tbodyDiseno) tbodyDiseno.innerHTML = '';
+        if(selectDiseno) selectDiseno.innerHTML = '<option value="" disabled selected>-- Elige un docente --</option>';
+        
+        // Mostrar la tabla de diseño solo al Súper Admin
+        const contDiseno = document.getElementById('contenedorJuecesDiseno');
+        if(contDiseno) {
+            if(yoSoySuper) contDiseno.classList.remove('hidden');
+            else contDiseno.classList.add('hidden');
+        }
         
         let listaMaestros = [];
         snapshot.forEach(docSnap => listaMaestros.push({ id: docSnap.id, ...docSnap.data() }));
@@ -439,6 +458,29 @@ window.cargarDatosAdmin = function() {
                         </td>
                     </tr>
                 `;
+            }
+
+            // 🔥 LÓGICA DE JUECES DE DISEÑO (Solo para el Súper Admin)
+            if (yoSoySuper) {
+                // Si el maestro ya es juez de diseño, lo agregamos a la tabla amarilla
+                if (m.juez_diseno) {
+                    if (tbodyDiseno) {
+                        tbodyDiseno.innerHTML += `
+                            <tr class="hover:bg-amber-100 border-b border-amber-100">
+                                <td class="px-1 py-2 text-[9px] font-black text-amber-900">${m.nombre}</td>
+                                <td class="px-1 py-2 text-center text-[10px]">${statusHtml}</td>
+                                <td class="px-1 py-2 text-center">
+                                    <button onclick="removerPermisoDiseno('${m.id}')" title="Quitar Permiso de Diseño" class="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-2 py-0.5 rounded font-bold text-[9px] transition-all">Revocar</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                } else {
+                    // Si no es juez de diseño, lo agregamos al menú desplegable del modal
+                    if (selectDiseno) {
+                        selectDiseno.innerHTML += `<option value="${m.id}">${m.nombre} (${m.rol || 'juez'})</option>`;
+                    }
+                }
             }
         });
     });
@@ -610,6 +652,9 @@ function iniciarRadarArena() {
     const catTag = obtenerTagExacto(currentCategory);
     if(!catTag) return; 
 
+    // 🔥 SEGURO ANTI-FANTASMAS: Al abrir la app o recargar, bloqueamos pop-ups viejos
+    window.resultadoMostrado = true; 
+
     const arenaRef = doc(db, "arenas", catTag);
 
     unsubscribeArena = onSnapshot(arenaRef, (docSnap) => {
@@ -627,6 +672,7 @@ function iniciarRadarArena() {
 
             activarModoCombate(data);
         } else if (data.estado === 'ko' && !combateTerminado) {
+            window.resultadoMostrado = false; // 🔥 APAGAMOS EL ESCUDO PARA QUE SÍ VEAN EL RESULTADO FINAL
             document.getElementById('juez-modo-espera').classList.add('hidden');
             document.getElementById('juez-modo-combate').classList.remove('hidden');
             
@@ -658,7 +704,8 @@ function iniciarRadarArena() {
             if (data.resultado_consenso && !window.resultadoMostrado) {
                 window.resultadoMostrado = true; 
                 window.mostrarModalResultado(data.resultado_consenso);
-            } else if (!data.resultado_consenso) {
+            } else {
+                // 🔥 SI ES UN REFRESH O YA SE MOSTRÓ: Mandamos a sala de espera silenciosamente
                 window.cerrarModalSync();
                 document.getElementById('juez-modo-espera').classList.remove('hidden');
                 document.getElementById('juez-modo-combate').classList.add('hidden');
@@ -699,6 +746,8 @@ function activarModoCombate(data) {
     if (yaVoto && !isCarrera) {
         const emitidos = data.jueces_votaron.length;
         const esperados = data.total_jueces_esperados || 2;
+        // Rescatamos el voto de la memoria
+        const miVoto = sessionStorage.getItem('fime_mi_voto_actual') || 'Registrado';
         
         // 🔥 Bloqueamos visualmente los botones de votación en gris
         document.querySelectorAll('#juez-modo-combate button').forEach(b => {
@@ -706,9 +755,15 @@ function activarModoCombate(data) {
             b.classList.add('opacity-50', 'cursor-not-allowed', 'grayscale');
         });
 
-        window.mostrarModalEspera(`¡VOTO ENVIADO CON ÉXITO!`, `Tu decisión ha sido registrada.\n\nFavor de esperar a los demás jueces (${emitidos} / ${esperados})...`);
+        // 🔥 ARMAMOS EL TEXTO EXACTO DEL VEREDICTO
+        const textoVeredicto = `TU VEREDICTO:\n¡${miVoto} ha sido el ganador para ti!\n\n(${emitidos}/${esperados} jueces terminaron de votar, espere por favor)`;
+
+        window.mostrarModalEspera(`¡VOTO ENVIADO!`, textoVeredicto);
         return; 
     } else {
+        // Limpiamos el voto anterior para que no interfiera en la siguiente pelea
+        sessionStorage.removeItem('fime_mi_voto_actual');
+        
         window.cerrarModalSync();
         // Restauramos los botones si es un round nuevo
         document.querySelectorAll('#juez-modo-combate button').forEach(b => {
@@ -849,19 +904,21 @@ window.enviarVeredictoFinal = async function(ladoGanador, metodo) {
 
     abrirModalConfirmar(`¿Declarar a ${ganadorNombre} como VENCEDOR sobre ${contrincante}?`, async () => {
         try {
+            // 🔥 GUARDAMOS EL VOTO EN MEMORIA PARA MOSTRARLO EN LA PANTALLA DE ESPERA
+            sessionStorage.setItem('fime_mi_voto_actual', ganadorNombre);
+
             const btnConfirm = document.querySelector('#modal-confirm-btn');
             if (btnConfirm) { btnConfirm.innerText = "⏳ ENVIANDO..."; btnConfirm.disabled = true; }
 
-            const { doc, getDoc, getDocs, setDoc, addDoc, collection, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const { doc, getDoc, setDoc, addDoc, collection } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
             
-            const qJueces = query(collection(db, "maestros_autorizados"), where("categoria", "==", miCatRaw), where("sesion_activa", "==", true), where("rol", "in", ["juez", "admin"]));
-            const snapJueces = await getDocs(qJueces);
-            let totalJuecesActivos = snapJueces.size || 1; 
-            const mayoriaRequerida = Math.floor(totalJuecesActivos / 2) + 1; 
-
             const arenaRef = doc(db, "arenas", miCat);
             const arenaSnap = await getDoc(arenaRef);
             const data = arenaSnap.data();
+            
+            // 🔥 BLINDAJE EXTREMO: Si el panel falla por caché, exigimos mínimo 2 jueces obligatorios
+            let totalJuecesActivos = data.total_jueces_esperados || 2; 
+            const mayoriaRequerida = Math.floor(totalJuecesActivos / 2) + 1;
 
             let juecesVotaron = data.jueces_votaron || [];
             if (juecesVotaron.includes(juezActual)) return; // Bloqueo de seguridad
@@ -898,9 +955,13 @@ window.enviarVeredictoFinal = async function(ladoGanador, metodo) {
                 if (ladoGanadorRound === 'r1') v1++;
                 else if (ladoGanadorRound === 'r2') v2++;
 
-                let proximaRonda = data.ronda_actual || 1;
-                if (v1 < 2 && v2 < 2) proximaRonda++;
                 let esFinDeCombate = (v1 >= 2 || v2 >= 2);
+                
+                // 🔥 EL ARREGLO FIME: Todo round jugado quema un cartucho. Avanzamos aunque sea empate.
+                let proximaRonda = (data.ronda_actual || 1) + 1;
+                
+                // 🔥 EL TOPE VISUAL: Si llegan al Round 3 y siguen empatando, se congela el selector en 3.
+                if (proximaRonda > 3) proximaRonda = 3;
 
                 let payloadFinal = { 
                     estado: 'inactivo',
@@ -936,11 +997,24 @@ window.enviarVeredictoFinal = async function(ladoGanador, metodo) {
                     jueces_votaron: juecesVotaron,
                     total_jueces_esperados: totalJuecesActivos
                 }, { merge: true });
+
+                // 🔥 BLOQUEO INSTANTÁNEO: Congelamos los botones en gris
+                document.querySelectorAll('#juez-modo-combate button').forEach(b => {
+                    b.disabled = true;
+                    b.classList.add('opacity-50', 'cursor-not-allowed', 'grayscale');
+                });
+                
+                // 🔥 MOSTRAMOS EL POP-UP PERSONALIZADO INMEDIATAMENTE
+                const miVoto = sessionStorage.getItem('fime_mi_voto_actual') || ganadorNombre;
+                const textoVeredicto = `TU VEREDICTO:\n¡${miVoto} ha sido el ganador para ti!\n\n(${totalVotosEmitidos}/${totalJuecesActivos} jueces terminaron de votar, espere por favor)`;
+                window.mostrarModalEspera(`¡VOTO ENVIADO!`, textoVeredicto);
             }
 
-            // Ocultamos el viejo modal de confirmación a la fuerza
+            // Ocultamos el viejo modal de confirmación a la fuerza (respetando los nuevos)
             document.querySelectorAll('[id*="modal"]').forEach(el => {
-                if (el.id !== 'modal-sync-juez' && !el.id.includes('botonera')) el.classList.add('hidden');
+                if (el.id !== 'modal-sync-juez' && !el.id.includes('botonera') && el.id !== 'modal-confirm-btn') {
+                    el.classList.add('hidden');
+                }
             });
             
         } catch (e) {
@@ -1500,14 +1574,14 @@ window.mostrarModalResultado = function(res) {
             <h2 class="text-xl font-black text-gray-800 uppercase tracking-tight mb-2">${titulo}</h2>
             <p class="text-gray-600 font-bold text-sm mb-6 whitespace-pre-line leading-relaxed">${texto}</p>
             <div class="bg-gray-100 rounded-lg p-3">
-                <p class="text-xs font-black text-gray-500 uppercase tracking-widest">Cerrando en <span id="sync-countdown" class="text-amber-600 text-lg">3</span> segundos...</p>
+                <p class="text-xs font-black text-gray-500 uppercase tracking-widest">Cerrando en <span id="sync-countdown" class="text-amber-600 text-lg">5</span> segundos...</p>
             </div>
         </div>
     `;
     document.body.appendChild(m);
 
     if (window.syncTimer) clearInterval(window.syncTimer);
-    let count = 3;
+    let count = 5;
     window.syncTimer = setInterval(() => {
         count--;
         const span = document.getElementById('sync-countdown');
@@ -1520,3 +1594,83 @@ window.mostrarModalResultado = function(res) {
         }
     }, 1000);
 }
+
+
+
+
+// =====================================================================
+// ✍️ FUNCIONES DEL PANEL SUPERADMIN PARA JUECES DE DISEÑO
+// =====================================================================
+window.abrirModalAsignarDiseno = () => {
+    document.getElementById('modalAsignarDiseno').classList.remove('hidden');
+};
+
+window.cerrarModalAsignarDiseno = () => {
+    document.getElementById('modalAsignarDiseno').classList.add('hidden');
+    document.getElementById('selectJuezDiseno').selectedIndex = 0;
+};
+
+window.guardarAsignacionDiseno = async () => {
+    const idSeleccionado = document.getElementById('selectJuezDiseno').value;
+    if (!idSeleccionado) return alert("❌ Selecciona a un docente de la lista.");
+    
+    try {
+        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await updateDoc(doc(db, "maestros_autorizados", idSeleccionado), { juez_diseno: true });
+        window.cerrarModalAsignarDiseno();
+    } catch (e) {
+        console.error("Error asignando diseño:", e);
+        alert("Ocurrió un error al asignar el permiso.");
+    }
+};
+
+window.removerPermisoDiseno = async (idDocente) => {
+    if(!confirm(`⚠️ ¿Estás seguro de quitarle a "${idDocente}" el permiso para evaluar diseño?`)) return;
+    try {
+        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        // Removemos el permiso poniéndolo en false
+        await updateDoc(doc(db, "maestros_autorizados", idDocente), { juez_diseno: false });
+    } catch (e) {
+        console.error("Error removiendo diseño:", e);
+    }
+};
+
+
+
+// =====================================================================
+// ⏳ SISTEMA DE INACTIVIDAD (IDLE TIME - 30 MINUTOS)
+// =====================================================================
+let inactividadTimer = null;
+const TIEMPO_LIMITE = 30 * 60 * 1000; // 30 minutos en milisegundos
+
+window.resetTimerInactividad = function() {
+    const usuarioActivo = sessionStorage.getItem('juez_nombre');
+    const esSuper = sessionStorage.getItem('juez_superadmin') === 'true';
+    
+    // El Súper Admin es inmune al idle time para evitar que se le cierre el proyector
+    if (!usuarioActivo || esSuper) return;
+
+    if (inactividadTimer) clearTimeout(inactividadTimer);
+
+    inactividadTimer = setTimeout(async () => {
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            // Apagamos su sesión real en la base de datos
+            await updateDoc(doc(db, "maestros_autorizados", usuarioActivo), { sesion_activa: false });
+        } catch (e) { 
+            console.error("Error de inactividad:", e); 
+        }
+        
+        sessionStorage.clear();
+        alert("⏳ Tu sesión ha sido cerrada tras 30 minutos de inactividad por seguridad.");
+        window.location.replace('index.html');
+    }, TIEMPO_LIMITE);
+};
+
+// Escuchamos cualquier movimiento o toque en pantalla para reiniciar el reloj de 30 mins
+['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evento => {
+    document.addEventListener(evento, window.resetTimerInactividad, { passive: true });
+});
+
+// Arrancamos el contador por primera vez
+setTimeout(window.resetTimerInactividad, 1000);

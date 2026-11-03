@@ -169,6 +169,19 @@ function iniciarRadarSesionBrackets() {
             window.location.href = 'brackets.html'; // Recargamos limpio para que lea su nueva categoría
             return;
         }
+
+        // 4. NUEVO: PERMISO DE DISEÑO (Mostrar/Ocultar tarjeta)
+        const tienePermisoDiseno = data.juez_diseno === true;
+        sessionStorage.setItem('juez_diseno', tienePermisoDiseno);
+        
+        const tarjetaDiseno = document.getElementById('tarjeta-modulo-diseno');
+        if (tarjetaDiseno) {
+            if (tienePermisoDiseno || isSuperAdmin) {
+                tarjetaDiseno.classList.remove('hidden');
+            } else {
+                tarjetaDiseno.classList.add('hidden');
+            }
+        }
     });
 }
 
@@ -218,7 +231,9 @@ function cargarDatosDesdeServidor() {
         const catMap = { "Pequeños": "pequenos", "Mediano": "mediano", "Medianos": "mediano", "Grandes": "grandes", "Seguimiento de línea": "seguimiento", "Evasor de obstáculos": "evasor" };
         const myViewId = catMap[miCat] || "pequenos"; 
         const todasLasTarjetas = ['pequenos', 'mediano', 'grandes', 'seguimiento', 'evasor'];
-        const contenedorTarjetas = document.querySelector('#view-menu > div:nth-of-type(2)');
+        
+        // 🔥 EL CULPABLE DESCUBIERTO: Ahora busca el 3er div, porque el 2do es nuestro botón azul
+        const contenedorTarjetas = document.querySelector('#view-menu > div:nth-of-type(3)');
 
         if (!isSuperAdmin) {
             // ADMIN NORMAL: Vista enfocada en su categoría (Lobby centrado)
@@ -227,17 +242,52 @@ function cargarDatosDesdeServidor() {
                 document.getElementById('view-menu').classList.add('active');
             }
             
-            // 🔥 ARREGLO VISUAL: Convertir el Grid en Flexbox Centrado
-            if (contenedorTarjetas) contenedorTarjetas.className = "flex flex-col items-center justify-center w-full max-w-lg mx-auto";
+            // Verificamos si este admin tiene permiso de diseño
+            const tienePermisoDiseno = sessionStorage.getItem('juez_diseno') === 'true';
+            const tarjetaDiseno = document.getElementById('tarjeta-modulo-diseno');
+            
+            // 🔥 MAGIA CSS GRID: Contenedor principal a 2 columnas
+            if (contenedorTarjetas) {
+                if (tienePermisoDiseno) {
+                    contenedorTarjetas.className = "grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl mx-auto items-stretch";
+                    if (tarjetaDiseno) {
+                        tarjetaDiseno.classList.remove('hidden', 'order-2');
+                        tarjetaDiseno.style.display = 'flex';
+                        // Diseño va abajo, estirado ocupando las 2 columnas
+                        tarjetaDiseno.classList.add('md:col-span-2', 'order-3', 'w-full'); 
+                    }
+                } else {
+                    contenedorTarjetas.className = "flex flex-col items-center justify-center w-full max-w-lg mx-auto";
+                    if (tarjetaDiseno) tarjetaDiseno.style.display = 'none';
+                }
+            }
             
             todasLasTarjetas.forEach(cat => {
-                // Seleccionamos el div "padre" que envuelve a la tarjeta y a los controles
                 const tarjetaPadre = document.querySelector(`[onclick="openCategory('${cat}')"]`)?.parentElement;
                 
                 if (tarjetaPadre) {
                     if (cat === myViewId) {
-                        tarjetaPadre.style.display = 'flex'; 
-                        tarjetaPadre.classList.add('w-full', 'items-center', 'justify-center');
+                        if (tienePermisoDiseno) {
+                            // "Rompe" la caja padre para reordenar sus hijos libres en el grid
+                            tarjetaPadre.style.display = 'contents'; 
+                            
+                            const card = tarjetaPadre.children[0];
+                            if (card) {
+                                // Tarjeta de Categoría va arriba a la derecha (order-2)
+                                card.classList.remove('order-1');
+                                card.classList.add('order-2', 'w-full', 'h-full'); 
+                            }
+                            
+                            const panel = document.getElementById(`panel-superadmin-${cat}`);
+                            if (panel) {
+                                // Control de Arena va arriba a la izquierda (order-1) ocupando 1 sola columna
+                                panel.classList.remove('md:col-span-2', 'order-3', 'mt-4'); 
+                                panel.classList.add('order-1', 'w-full', 'h-full', 'm-0'); 
+                            }
+                        } else {
+                            tarjetaPadre.style.display = 'flex'; 
+                            tarjetaPadre.classList.add('w-full', 'items-center', 'justify-center');
+                        }
                     } else {
                         tarjetaPadre.style.display = 'none'; 
                     }
@@ -259,11 +309,10 @@ function cargarDatosDesdeServidor() {
             }
             if (contenedorTarjetas) contenedorTarjetas.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
             
-            // 🔥 Mostrar botón de Admin Solitario
+            // 🔥 Mostrar botón de Admin Solitario (Versión limpia)
             const btnSolitario = document.getElementById('btnModoSolitario');
             if (btnSolitario) {
                 btnSolitario.classList.remove('hidden');
-                btnSolitario.classList.add('flex');
             }
             
             todasLasTarjetas.forEach(cat => {
@@ -357,13 +406,64 @@ window.goToMenu = () => {
 window.openCategory = (cat) => {
     showView(cat);
     document.getElementById('btnReturnAdmin').classList.add('hidden');
-    document.getElementById('btnTopMenuElim')?.classList.add('hidden'); // 🔥 Lo mantenemos oculto al entrar a la tarjeta inicial
+    document.getElementById('btnTopMenuElim')?.classList.add('hidden'); 
     
-    if (['pequenos', 'mediano', 'grandes'].includes(cat)) {
-        renderTournament(cat, 'menu');
+    // 🔥 CONTROL DE ENCABEZADO GLOBAL (Cambio de Verde a Celeste)
+    const headerTitle = document.querySelector('header h1');
+    const headerSubtitle = document.querySelector('header p');
+    const headerLine = document.querySelector('header div.bg-emerald-800');
+    
+    if (cat === 'diseno') {
+        // Modo Diseño: Textos Celestes/Azules
+        if (headerTitle) {
+            headerTitle.textContent = "TABLA DE EVALUACIONES DE DISEÑO DE ROBOTS";
+            headerTitle.className = "text-3xl md:text-5xl font-extrabold text-sky-600 tracking-tight uppercase drop-shadow-sm";
+        }
+        if (headerSubtitle) {
+            headerSubtitle.textContent = "✍️ EVALUACIÓN DISEÑO DE ROBOTS";
+            headerSubtitle.className = "text-blue-700 text-sm md:text-base font-bold tracking-widest mt-2 uppercase opacity-90";
+        }
+        if (headerLine) headerLine.className = "h-1.5 w-32 bg-sky-600 mx-auto mt-4 rounded-full";
+        
+        if (typeof window.renderTablaDiseno === 'function') window.renderTablaDiseno();
+        
     } else {
-        renderTimeTable(cat);
+        // Modo Normal (Combates): Textos Verdes
+        if (headerTitle) {
+            headerTitle.textContent = "Guerra de Robots";
+            headerTitle.className = "text-3xl md:text-5xl font-extrabold text-emerald-800 tracking-tight uppercase drop-shadow-sm";
+        }
+        if (headerSubtitle) {
+            headerSubtitle.textContent = "Monitoreo de Fase de Eliminatorias";
+            headerSubtitle.className = "text-emerald-700 text-sm md:text-base font-bold tracking-widest mt-2 uppercase opacity-90";
+        }
+        if (headerLine) headerLine.className = "h-1.5 w-32 bg-emerald-800 mx-auto mt-4 rounded-full";
+        
+        if (['pequenos', 'mediano', 'grandes'].includes(cat)) {
+            renderTournament(cat, 'menu');
+        } else {
+            renderTimeTable(cat);
+        }
     }
+};
+
+// 🔥 También debemos asegurarnos de que al regresar al Lobby, el título vuelva a ser el original verde
+const oldGoToMenu = window.goToMenu;
+window.goToMenu = () => {
+    oldGoToMenu();
+    const headerTitle = document.querySelector('header h1');
+    const headerSubtitle = document.querySelector('header p');
+    const headerLine = document.querySelector('header div.bg-sky-600'); // Buscamos la línea celeste para regresarla a verde
+    
+    if (headerTitle) {
+        headerTitle.textContent = "Guerra de Robots";
+        headerTitle.className = "text-3xl md:text-5xl font-extrabold text-emerald-800 tracking-tight uppercase drop-shadow-sm";
+    }
+    if (headerSubtitle) {
+        headerSubtitle.textContent = "Monitoreo de Fase de Eliminatorias";
+        headerSubtitle.className = "text-emerald-700 text-sm md:text-base font-bold tracking-widest mt-2 uppercase opacity-90";
+    }
+    if (headerLine) headerLine.className = "h-1.5 w-32 bg-emerald-800 mx-auto mt-4 rounded-full";
 };
 
 // =====================================================================
@@ -1430,11 +1530,32 @@ window.nuclearResetCarreras = async function(cat) {
 };
 
 
-// 🔥 MODO SOLITARIO ESTADO GLOBAL
-window.isModoSolitarioActivo = false;
+// 🔥 MODO SOLITARIO ESTADO GLOBAL (Con Memoria Anti-Amnesia)
+window.isModoSolitarioActivo = sessionStorage.getItem('fime_modo_solitario') === 'true';
+
+// Auto-restaurar el botón visual si estaba activo al recargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const btn = document.getElementById('btnModoSolitario');
+        const isSuperAdmin = sessionStorage.getItem('juez_superadmin') === 'true';
+        
+        // Lo mostramos aquí desde el inicio para que no parpadee ni se achique
+        if (btn && isSuperAdmin) {
+            btn.classList.remove('hidden');
+            
+            if (window.isModoSolitarioActivo) {
+                btn.innerHTML = "📺 Activar Admin Multi-Pantallas";
+                btn.classList.replace('bg-purple-600', 'bg-blue-600');
+                btn.classList.replace('hover:bg-purple-700', 'hover:bg-blue-700');
+            }
+        }
+    }, 100); 
+});
 
 window.toggleModoSolitario = function() {
     window.isModoSolitarioActivo = !window.isModoSolitarioActivo;
+    sessionStorage.setItem('fime_modo_solitario', window.isModoSolitarioActivo);
+    
     const btn = document.getElementById('btnModoSolitario');
     
     if (window.isModoSolitarioActivo) {
@@ -1447,10 +1568,8 @@ window.toggleModoSolitario = function() {
         btn.classList.replace('hover:bg-blue-700', 'hover:bg-purple-700');
     }
     
-    // Recargar los paneles para aplicar los nuevos permisos (Ojo de Dios -> Panel de Control)
     inyectarOjoDeDios();
     
-    // 🔥 MAGIA UX: Forzamos el regreso al Lobby para que el usuario vea el cambio de paneles
     if (typeof window.goToMenu === 'function') {
         window.goToMenu();
     }
@@ -1713,20 +1832,64 @@ function inyectarOjoDeDios() {
                 const currentR1 = selR1.value;
                 const currentR2 = selR2 ? selR2.value : '';
                 
-                let opts = `<option value="">-- ESPERANDO --</option>`;
+                // 🔥 SEPARADOR VISUAL: Buscar quiénes faltan por pelear en los brackets
+                const tData = tournamentData[catLoop];
+                let pendientes = new Set();
+                
+                if (tData) {
+                    const checkMatches = (arr) => {
+                        if(!arr) return;
+                        arr.forEach(m => {
+                            if (m.winner === null && m.player1 && m.player2 && !m.isBye) {
+                                pendientes.add(m.player1);
+                                pendientes.add(m.player2);
+                            }
+                        });
+                    };
+                    checkMatches(tData.round1Matches);
+                    checkMatches(tData.repechageMatches);
+                    if (tData.laterRounds) tData.laterRounds.forEach(r => checkMatches(r.matches));
+                }
+
+                let optsPendientes = `<optgroup label="🔥 FALTAN POR PELEAR">`;
+                let optsListos = `<optgroup label="✅ YA TIENEN CHECK">`;
+                let hayPendientes = false;
+                let hayListos = false;
+
                 comp.filter(c => {
                     let cTag = c.categoria_tag || '';
                     let cOrig = (c.categoria_original || '').toLowerCase();
                     return cTag === catLoop || cOrig.includes(catLoop.substring(0,4));
                 }).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
-                    opts += `<option value="${c.nombre}">${c.nombre}</option>`;
+                    if (pendientes.has(c.nombre)) {
+                        optsPendientes += `<option value="${c.nombre}">${c.nombre}</option>`;
+                        hayPendientes = true;
+                    } else {
+                        optsListos += `<option value="${c.nombre}">${c.nombre}</option>`;
+                        hayListos = true;
+                    }
                 });
+                
+                optsPendientes += `</optgroup>`;
+                optsListos += `</optgroup>`;
+                
+                let opts = `<option value="">-- ESPERANDO --</option>`;
+                if (hayPendientes) opts += optsPendientes;
+                if (hayListos) opts += optsListos;
                 
                 selR1.innerHTML = opts;
                 if(selR2) selR2.innerHTML = opts;
                 
-                selR1.value = currentR1;
-                if(selR2) selR2.value = currentR2;
+                // 🔥 BLINDAJE ANTI-F5: Rescatamos los nombres desde la arena activa en Firebase
+                const arenaCache = window.arenasLiveCache ? window.arenasLiveCache[catLoop] : null;
+                
+                if (arenaCache && arenaCache.robot1) selR1.value = arenaCache.robot1;
+                else selR1.value = currentR1;
+                
+                if (selR2) {
+                    if (arenaCache && arenaCache.robot2) selR2.value = arenaCache.robot2;
+                    else selR2.value = currentR2;
+                }
             });
         });
     }
@@ -1739,7 +1902,8 @@ window.saAccionArena = async function(cat, accion) {
     
     if (accion === 'limpiar') {
         if(!confirm(`🧹 ¿Limpiar arena de ${cat.toUpperCase()}?`)) return;
-        await setDoc(arenaRef, { robot1: '', robot2: '', estado: 'inactivo' }, { merge: true });
+        // 🔥 Limpiamos también el resultado fantasma de la BD
+        await setDoc(arenaRef, { robot1: '', robot2: '', estado: 'inactivo', resultado_consenso: null }, { merge: true });
         const selR1 = document.getElementById(`sa-r1-${cat}`);
         const selR2 = document.getElementById(`sa-r2-${cat}`);
         if (selR1) selR1.value = '';
@@ -1751,10 +1915,18 @@ window.saAccionArena = async function(cat, accion) {
     }
     else if (accion === 'reset_victorias') {
         if(!confirm("🔄 ¿Deseas reiniciar el marcador de victorias a 0 - 0 y regresar la categoría al Round 1?")) return;
+        
+        // 🔥 BLINDAJE: Leemos los robots actuales para que no se borren de la memoria
+        const r1Actual = document.getElementById(`sa-r1-${cat}`).value;
+        const r2Actual = document.getElementById(`sa-r2-${cat}`) ? document.getElementById(`sa-r2-${cat}`).value : '';
+
         await setDoc(arenaRef, { 
             victorias_r1: 0, 
             victorias_r2: 0, 
-            ronda_actual: 1 
+            ronda_actual: 1,
+            robot1: r1Actual,
+            robot2: r2Actual,
+            estado: 'inactivo'
         }, { merge: true });
     }
     else if (accion === 'iniciar') {
@@ -1781,10 +1953,45 @@ window.saAccionArena = async function(cat, accion) {
             
             // Regla A: Advertencia inteligente si están 0-0 y avanzan de ronda (Por Empate)
             if (currentV1 === 0 && currentV2 === 0 && numeroRonda > 1) {
-                if(!confirm("⚠️ El marcador está 0 - 0 pero intentas iniciar una ronda avanzada.\n\n¿Hubo un EMPATE TÉCNICO previo y deseas continuar?")) {
+                const confirmarEmpate = await window.confirmarAccionAdmin(
+                    "¿EMPATE TÉCNICO?", 
+                    "El marcador está 0 - 0 pero intentas iniciar una ronda avanzada.\n\n¿Hubo un empate técnico previo y deseas continuar?"
+                );
+                if(!confirmarEmpate) {
                     if(rondaInput) rondaInput.value = "1";
                     return;
                 }
+            }
+
+            // 🔥 REGLA B: Bloqueo si los robots ya pelearon y tienen "Check" en los brackets
+            const tData = tournamentData[cat];
+            let yaPelearon = false;
+            let ganadorPrevio = null;
+            
+            if (tData) {
+                const checkYaPelearon = (arr) => {
+                    if(!arr) return;
+                    arr.forEach(m => {
+                        if ((m.player1 === r1 && m.player2 === r2) || (m.player1 === r2 && m.player2 === r1)) {
+                            if (m.winner !== null) {
+                                yaPelearon = true;
+                                ganadorPrevio = m.winner;
+                            }
+                        }
+                    });
+                };
+                
+                checkYaPelearon(tData.round1Matches);
+                checkYaPelearon(tData.repechageMatches);
+                if (tData.laterRounds) tData.laterRounds.forEach(r => checkYaPelearon(r.matches));
+            }
+            
+            if (yaPelearon) {
+                const confirmarRepetida = await window.confirmarAccionAdmin(
+                    "¡PELEA REPETIDA!", 
+                    `Estos robots ya se enfrentaron y  ${ganadorPrevio}  ya tiene el check de victoria.\n\n¿Estás absolutamente seguro de que quieres forzar esta batalla?`
+                );
+                if(!confirmarRepetida) return;
             }
             
             // Regla B: Si ya llevan puntos y le pican al "Round 1", les advertimos de que se va a resetear.
@@ -1797,6 +2004,28 @@ window.saAccionArena = async function(cat, accion) {
             }
         }
         
+        // 🔥 MAGIA: Contamos a los jueces ANTES de arrancar la pelea para evitar bugs de conteo rápido
+        const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const snapJueces = await getDocs(collection(db, "maestros_autorizados"));
+        let juecesValidos = [];
+        const isSuper = sessionStorage.getItem('juez_superadmin') === 'true';
+        
+        snapJueces.forEach(d => {
+            let j = d.data();
+            // 🔥 ARREGLO: Convertimos a minúsculas para ignorar si en la BD dice "Mediano" y en la arena "mediano"
+            let catJuez = j.categoria ? j.categoria.toLowerCase().trim() : '';
+            let catArena = cat.toLowerCase().trim();
+            
+            if (j.sesion_activa && (catJuez === catArena || catJuez.includes(catArena.substring(0,4))) && (j.rol === 'juez' || j.rol === 'admin')) {
+                juecesValidos.push(d.id);
+            }
+        });
+        
+        // Si el Super Admin está iniciando la pelea, asumimos que tiene su botonera abierta y lo sumamos
+        if (isSuper) juecesValidos.push('Súper Admin');
+        
+        console.log(`🤖 Arena ${cat}: Se detectaron ${juecesValidos.length} jueces activos (Incluyéndote si eres Súper Admin).`);
+
         let payloadInicio = { 
             robot1: r1, 
             robot2: isCarrera ? '' : r2, 
@@ -1804,13 +2033,13 @@ window.saAccionArena = async function(cat, accion) {
             tiempo_inicio: Date.now() / 1000,
             tiempo_ronda: tiempoRound,
             ronda_actual: numeroRonda,
-            // 🔥 NUEVO: Limpiamos la urna de votos para el nuevo round
             votos_r1: 0,
             votos_r2: 0,
-            jueces_votaron: [] 
+            jueces_votaron: [],
+            total_jueces_esperados: juecesValidos.length || 1,
+            resultado_consenso: null // 🔥 Matamos el pop-up viejo al arrancar el nuevo round
         };
         
-        // Si inician forzosamente en Round 1, ejecutamos el reseteo del marcador en la base de datos
         if (numeroRonda === 1 && !isCarrera) {
             payloadInicio.victorias_r1 = 0;
             payloadInicio.victorias_r2 = 0;
@@ -2092,7 +2321,7 @@ window.abrirBotoneraJuez = function(cat) {
             </button>
         </div>
         <!-- Inyectamos index.html con un parámetro secreto -->
-        <iframe src="index.html?modo=juez" class="flex-grow w-full border-none bg-gray-50"></iframe>
+        <iframe src="index.html?modo=juez&catForzada=${cat}" class="flex-grow w-full border-none bg-gray-50"></iframe>
     `;
     document.body.appendChild(m);
 };
@@ -2128,4 +2357,43 @@ window.mostrarAvisoAdmin = function(titulo, texto, tipo = 'info') {
         </div>
     `;
     document.body.appendChild(m);
+};
+
+
+
+// --- MODAL DE CONFIRMACIÓN ELEGANTE (CON PROMESAS) ---
+window.confirmarAccionAdmin = function(titulo, texto) {
+    return new Promise((resolve) => {
+        const viejo = document.getElementById('modal-confirm-admin');
+        if (viejo) viejo.remove();
+
+        const m = document.createElement('div');
+        m.id = 'modal-confirm-admin';
+        m.className = "fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in px-4";
+        m.innerHTML = `
+            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-red-600 transform scale-110">
+                <div class="text-5xl mb-4 drop-shadow-sm">🛑</div>
+                <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight mb-2">${titulo}</h2>
+                <p class="text-gray-600 font-bold text-xs mb-8 whitespace-pre-line leading-relaxed">${texto}</p>
+                <div class="flex gap-3">
+                    <button id="btn-cancelar-accion" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black py-3 px-4 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95">
+                        Cancelar
+                    </button>
+                    <button id="btn-aceptar-accion" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 px-4 rounded-xl text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                        Sí, Forzar
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+
+        document.getElementById('btn-cancelar-accion').onclick = () => {
+            m.remove();
+            resolve(false); // Responde "No" al código
+        };
+        document.getElementById('btn-aceptar-accion').onclick = () => {
+            m.remove();
+            resolve(true); // Responde "Sí" al código
+        };
+    });
 };

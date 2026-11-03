@@ -86,11 +86,7 @@
         <div
             class="w-full md:w-1/3 flex flex-col md:flex-row justify-center md:justify-end items-center md:items-center order-3 md:order-3 gap-3">
 
-            <!-- NUEVO: Botón Administrador Solitario (Solo SuperAdmin) -->
-            <button id="btnModoSolitario" onclick="toggleModoSolitario()"
-                class="hidden bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-xs uppercase tracking-widest items-center gap-2">
-                🦸‍♂️ Activar Admin Solitario
-            </button>
+            
 
             <!-- Botón Original (Panel Admin) -->
             <button id="btnReturnAdmin" onclick="salidaSeguraPanel()"
@@ -138,6 +134,13 @@
                 <button onclick="exportAllToExcel()"
                     class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 text-xs uppercase tracking-wider flex items-center gap-2">
                     📊 Descargar Copia (.xlsx)
+                </button>
+            </div>
+            
+            <!-- CONTENEDOR DEL BOTÓN SÚPER ADMIN (CENTRADO Y RESPONSIVO) -->
+            <div class="w-full flex justify-center mb-8 px-4">
+                <button id="btnModoSolitario" onclick="toggleModoSolitario()" class="hidden flex w-full max-w-2xl bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 items-center justify-center gap-3 border-b-4 border-blue-800 uppercase tracking-[0.2em] text-sm">
+                    📺 Activar Admin Multi-Pantallas
                 </button>
             </div>
 
@@ -311,6 +314,17 @@
                     </div>
 
                     </div>
+
+                <!-- ✍️ GRUPO EVALUACIÓN DISEÑO (NUEVO) -->
+                <div id="tarjeta-modulo-diseno" class="hidden flex flex-col gap-3 sm:col-span-2 lg:col-span-1">
+                    <div onclick="openCategory('diseno')" class="bg-white border-2 border-transparent hover:border-blue-400 rounded-2xl p-8 text-center cursor-pointer shadow-md hover:shadow-xl transition-all transform hover:-translate-y-2 relative overflow-hidden group h-full flex flex-col justify-center">
+                        <div class="absolute top-0 left-0 w-full h-1.5 bg-blue-400 transition-all group-hover:h-2"></div>
+                        <span class="text-6xl block mb-4 group-hover:scale-110 transition-transform">✍️</span>
+                        <h3 class="text-xl font-extrabold text-gray-800 tracking-tight">Evaluación Diseño</h3>
+                        <span class="inline-block mt-3 px-4 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wider w-max mx-auto">Módulo Especial</span>
+                    </div>
+                </div>
+
             </div>
 
             <!-- BOTON PARA REINICIAR TODO (SOLO SUPER ADMIN) -> MOVIDO FUERA DEL GRID -->
@@ -347,6 +361,24 @@
 
         <div class="view w-full max-w-5xl" id="view-evasor">
             <div id="time-evasor"></div>
+        </div>
+
+        <!-- ✍️ VISTA: EVALUACIÓN DE DISEÑO -->
+        <div class="view w-full" id="view-diseno">
+            <div class="text-center mb-10">
+                
+                <!-- LEYENDA DE EMOJIS (Instrucciones para el Juez) -->
+                <div class="mt-6 flex flex-wrap justify-center gap-4 text-xs font-bold text-gray-600 bg-white inline-flex px-6 py-3 rounded-xl shadow-sm border border-gray-100">
+                    <span class="flex items-center gap-1"><span class="text-base">📝</span> Pendiente de evaluar</span>
+                    <span class="flex items-center gap-1 border-l border-gray-200 pl-4"><span class="text-base">✅</span> Ya evaluado (Bloqueado)</span>
+                    <span class="flex items-center gap-1 border-l border-gray-200 pl-4"><span class="text-base">📝🔄</span> Empate (2da ronda requerida)</span>
+                </div>
+            </div>
+            
+            <div id="tournament-diseno" class="w-full max-w-6xl mx-auto pb-10">
+                <!-- Aquí se inyectarán las tablas de diseño con JS en el siguiente paso -->
+                <div class="text-center text-gray-400 font-bold p-10 animate-pulse">⏳ Cargando tablas de diseño...</div>
+            </div>
         </div>
 
     </main>
